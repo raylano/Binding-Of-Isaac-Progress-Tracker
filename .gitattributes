@@ -1,2 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+# Shellscripts draaien in de container: altijd LF
+*.sh text eol=lf
+# PowerShell-script: CRLF, zoals Windows het verwacht
+*.ps1 text eol=crlf

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Kelderdagboek — Isaac Repentance+</title>
+  <meta name="theme-color" content="#17100b">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="fonts/gochi-hand.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/patrick-hand.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/style.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <!-- Gedeelde SVG-definities: wiebelige inkt en de 12 bosssymbolen (zelf getekend). -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <filter id="wobble" x="-5%" y="-5%" width="110%" height="110%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" seed="3" result="n"/>
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="3.2"/>
+      </filter>
+      <filter id="scribble" x="-10%" y="-10%" width="120%" height="120%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="1" seed="7" result="n"/>
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="1.6"/>
+      </filter>
+      <symbol id="g-heart" viewBox="0 0 32 32"><path d="M16 27C6 19.5 3 13.5 6 8.6 9 4.4 14 5.8 16 10c2-4.2 7-5.6 10-1.4 3 4.9 0 10.9-10 18.4Z"/><path d="M11 11.5c1-1.5 2.5-2 3.5-1.6"/></symbol>
+      <symbol id="g-isaac" viewBox="0 0 32 32"><path d="M16 3.5V28.5M8 10.8h16"/></symbol>
+      <symbol id="g-satan" viewBox="0 0 32 32"><path d="M16 3.5V28.5M8 21.2h16"/></symbol>
+      <symbol id="g-bluebaby" viewBox="0 0 32 32"><path d="M10.5 11.2C10.5 5.6 21.5 5 21.5 11c0 4.4-5.4 4.6-5.4 9.4"/><path d="M16.1 25.4v.6"/></symbol>
+      <symbol id="g-lamb" viewBox="0 0 32 32"><path d="M16 4l6.9 21.6L4.6 12.3h22.8L9.1 25.6Z"/></symbol>
+      <symbol id="g-megasatan" viewBox="0 0 32 32"><path d="M8.5 4.5c-.5 5 1.5 8 4.5 9.5M23.5 4.5c.5 5-1.5 8-4.5 9.5"/><path d="M8.5 18c0-6 15-6 15 0 0 5.5-3.5 8.5-7.5 8.5S8.5 23.5 8.5 18Z"/><path d="M12.5 17.6l2.4 1.2M19.5 17.6l-2.4 1.2M13 22.5c2 1.4 4 1.4 6 0"/></symbol>
+      <symbol id="g-bossrush" viewBox="0 0 32 32"><path d="M6 19a10 10 0 1 0 20 0 10 10 0 1 0-20 0"/><path d="M16 19v-6M16 19l4 3M12.5 4h7M16 4v5M24.5 8.5l2 2"/></symbol>
+      <symbol id="g-hush" viewBox="0 0 32 32"><path d="M5.5 16.5a10.5 10.5 0 1 0 21 0 10.5 10.5 0 1 0-21 0"/><path d="M10.5 14.5q2.2 1.8 4.4 0M17.1 14.5q2.2 1.8 4.4 0M12.5 21.5h7"/></symbol>
+      <symbol id="g-delirium" viewBox="0 0 32 32"><path d="M16 16.5c1.2 0 1.6 1.6.4 2.2-1.8.9-3.6-.6-3.2-2.6.5-2.6 3.8-3.6 5.8-2 2.7 2 2.2 6.4-.8 7.8-3.6 1.7-8-.6-8.3-4.6-.4-4.6 4-8.2 8.5-7.4 5.2.9 8 6.4 6 11.2"/><path d="M25 6l1.5-2M28 10l2-.6"/></symbol>
+      <symbol id="g-greed" viewBox="0 0 32 32"><path d="M5.5 16a10.5 10.5 0 1 0 21 0 10.5 10.5 0 1 0-21 0"/><path d="M19.4 11.6c-2-1.6-6.2-1.2-6.2 1.6 0 3.2 6.2 2.4 6.2 5.8 0 2.8-4.4 3.2-6.4 1.6M16.2 8.6v14.8"/></symbol>
+      <symbol id="g-mother" viewBox="0 0 32 32"><path d="M3 17c5.2-8.4 20.8-8.4 26 0-5.2 8.4-20.8 8.4-26 0Z"/><path d="M12 17a4 4 0 1 0 8 0 4 4 0 1 0-8 0M16 4.5v3.4M8 6.6l2 3M24 6.6l-2 3"/></symbol>
+      <symbol id="g-beast" viewBox="0 0 32 32"><path d="M9.5 15c0-7.5 13-7.5 13 0 0 3.6-2 4.6-2 6.6h-9c0-2-2-3-2-6.6Z"/><path d="M12.8 21.6v4h6.4v-4M13.2 15.2h1.8M17 15.2h1.8M9.6 12C6 10 4.6 6.6 5.4 3.2M22.4 12c3.6-2 5-5.4 4.2-8.8"/></symbol>
+      <symbol id="g-lock" viewBox="0 0 32 32"><path d="M10 14v-4a6 6 0 0 1 12 0v4"/><path d="M7.5 14.5h17v12h-17Z"/><path d="M16 19v3"/></symbol>
+    </defs>
+  </svg>
+
+  <div id="lock" class="lock" hidden>
+    <div class="door">
+      <svg class="door-art" viewBox="0 0 200 220" aria-hidden="true">
+        <g filter="url(#wobble)">
+          <path d="M20 215V95C20 40 60 10 100 10s80 30 80 85v120Z" fill="#3a2618" stroke="#0e0805" stroke-width="6"/>
+          <path d="M60 215V60M100 215V14M140 215V60" stroke="#24170e" stroke-width="5"/>
+          <path d="M22 120h156M22 180h156" stroke="#5a3b22" stroke-width="10"/>
+          <circle cx="44" cy="120" r="4" fill="#0e0805"/><circle cx="156" cy="120" r="4" fill="#0e0805"/>
+          <circle cx="44" cy="180" r="4" fill="#0e0805"/><circle cx="156" cy="180" r="4" fill="#0e0805"/>
+          <path d="M84 132v-14a16 16 0 0 1 32 0v14" fill="none" stroke="#9c7518" stroke-width="7"/>
+          <rect x="74" y="130" width="52" height="42" rx="5" fill="#e3b23c" stroke="#0e0805" stroke-width="5"/>
+          <path d="M100 145v12" stroke="#0e0805" stroke-width="6" stroke-linecap="round"/>
+        </g>
+      </svg>
+      <h1>Deze deur is op slot</h1>
+      <p>Toets je code in om de kelder in te gaan.</p>
+      <div class="pin-dots" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <form id="pin-form" autocomplete="off">
+        <label class="sr" for="pin-input">PIN</label>
+        <input id="pin-input" class="sr" inputmode="numeric" maxlength="12" autocomplete="current-password" type="password">
+        <div class="pin-pad">
+          <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
+          <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button>
+          <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button>
+          <button type="button" data-k="back" aria-label="Wissen">&larr;</button><button type="button" data-k="0">0</button><button type="submit" aria-label="Openen">&#10003;</button>
+        </div>
+      </form>
+      <div class="pin-err" id="pin-err" role="alert"></div>
+    </div>
+  </div>
+
+  <header class="hud" id="hud" hidden>
+    <div class="hud-row">
+      <a class="logo" href="#/">Kelderdagboek<small>Repentance+ voortgang</small></a>
+      <div class="hearts" id="hud-hearts" aria-hidden="true"></div>
+      <div class="stats" id="hud-stats"></div>
+      <div class="hud-spacer"></div>
+      <div class="sync-pill" id="sync-pill"><i></i><span>opgeslagen</span></div>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="Onderdelen">
+      <a class="tab" href="#/">Kelder</a>
+      <a class="tab" href="#/personages">Personages</a>
+      <a class="tab" href="#/kaart">Kaart</a>
+      <a class="tab" href="#/geheimen">Geheimen</a>
+      <a class="tab" href="#/route">Route</a>
+      <a class="tab" href="#/sync">Sync</a>
+    </nav>
+  </header>
+
+  <main id="view" aria-live="polite"><div class="loading">De kelder in…</div></main>
+
+  <footer id="footer" hidden>
+    Unlock-gegevens: <a href="https://bindingofisaacrebirth.wiki.gg/wiki/Achievements" rel="noopener" target="_blank">Binding of Isaac: Rebirth Wiki</a> (CC BY-SA 3.0).
+    Achievement-iconen: Steam. Route-advies: Steam-guides, zie <a href="#/route">Route</a>.
+    Fanproject, niet verbonden aan Nicalis of Edmund McMillen.
+  </footer>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+</body>
+</html>

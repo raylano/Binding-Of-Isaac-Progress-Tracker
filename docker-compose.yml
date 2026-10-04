@@ -1,0 +1,18 @@
+services:
+  boipt:
+    build: .
+    image: boipt:latest
+    container_name: boipt
+    restart: unless-stopped
+    # Alleen op localhost: nginx zet hem op isaac.wolfs.dev met HTTPS.
+    ports:
+      - "127.0.0.1:${PORT:-8090}:8080"
+    volumes:
+      # progress.json blijft hier staan, ook na een rebuild
+      - ./data:/data
+    environment:
+      ACCESS_PIN: "${ACCESS_PIN:?Zet ACCESS_PIN in .env}"
+      SESSION_SECRET: "${SESSION_SECRET:-}"
+      STEAM_ID: "${STEAM_ID:-}"
+      STEAM_API_KEY: "${STEAM_API_KEY:-}"
+      TRUST_PROXY: "${TRUST_PROXY:-1}"

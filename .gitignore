@@ -1,0 +1,9 @@
+node_modules/
+.env
+*.log
+.DS_Store
+
+# Voortgang en sessiegeheim blijven op de server; de map zelf staat in de repo
+# zodat Docker hem niet als root hoeft aan te maken.
+data/*
+!data/.gitkeep
