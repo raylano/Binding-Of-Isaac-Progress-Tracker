@@ -9,6 +9,7 @@ export const store = {
   state: null,
   base: null, // updatedAt van de laatst bekende serverversie
   config: {},
+  session: {},
   status: 'idle', // idle | saving | error
 };
 
@@ -28,11 +29,13 @@ export async function api(path, opts = {}) {
 }
 
 export async function loadAll() {
-  const [achievements, progress, config] = await Promise.all([
+  const [achievements, progress, config, session] = await Promise.all([
     fetch('data/achievements.json').then((r) => r.json()),
     api('/progress'),
     api('/config'),
+    api('/session'),
   ]);
+  store.session = session;
   store.model = buildModel(achievements);
   store.state = normalizeState(progress);
   store.base = progress.updatedAt || null;

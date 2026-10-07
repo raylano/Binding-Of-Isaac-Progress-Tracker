@@ -15,7 +15,8 @@ een donkere kelder, papieren briefjes en een pixel-HUD.
 - **Sync**: je save-bestand inlezen (exact, inclusief Hard-marks en tellers zoals de
   Greed-machine), Steam-achievements aanvullen, of automatisch na het spelen via
   `tools/sync-save.ps1`.
-- **Privé**: alles achter een PIN, met rate limits.
+- **Eigen accounts**: iedereen registreert zich met e-mail en wachtwoord; voortgang en
+  save-uploads zijn strikt per account. Rate limits, intrekbare sessies.
 
 ## Lokaal draaien
 
@@ -27,13 +28,13 @@ npm install
 cp .env.example .env
 ```
 
-Zet in `.env` minstens `ACCESS_PIN` en voor lokaal `TRUST_PROXY=0`, en start:
+Zet in `.env` voor lokaal `TRUST_PROXY=0`, en start:
 
 ```bash
 npm run dev
 ```
 
-De site staat dan op http://localhost:8090.
+De site staat dan op http://localhost:8090. Maak daar een account.
 
 ## Tests
 
@@ -60,15 +61,35 @@ npm run build-data
 
 | Pad | Wat |
 |---|---|
-| `server/` | Express: statische site, PIN-login, rate limits, voortgang (`data/progress.json`), Steam-proxy, save-upload |
+| `server/` | Express: statische site, accounts en sessies, rate limits, voortgang per account, Steam-proxy, save-upload |
+| `server/accounts.js` | Accounts (`data/users.json`) en sessies (`data/sessions.json`) |
+| `server/passwords.js` | E-mail normaliseren, wachtwoordregels, scrypt-hashes |
+| `server/store.js` | Voortgang in `data/users/<id>/progress.json`, eenmalige overname van de oude PIN-voortgang |
 | `web/js/save-parser.js` | Leest `rep+persistentgamedata*.dat` (achievements, marks, tellers); draait in browser en Node |
 | `web/js/logic.js` | Afhankelijkheden: wat is binnen, beschikbaar of op slot, en waarom |
 | `web/js/advisor.js` | Run-planner en meta-route |
 | `web/data/characters.js` | Personages en marks in save-volgorde |
 | `web/data/route.js` | Meta-route en "liever uitstellen", met bronnen |
-| `tools/sync-save.ps1` | Save insturen zonder browser, ook automatisch na het spelen |
+| `tools/sync-save.ps1` | Save insturen naar je account zonder browser, ook automatisch na het spelen |
 
 Deployen: zie [DEPLOY.md](DEPLOY.md).
+
+## Accounts en beveiliging
+
+| Onderwerp | Keuze |
+|---|---|
+| Registratie | Open voor iedereen. E-mail wordt getrimd en in kleine letters gezet (punten en `+label` blijven). Geen e-mailverificatie of wachtwoordherstel per mail: de server verstuurt geen mail. |
+| Wachtwoord | 12 tot 128 tekens, niet één herhaald teken, niet gelijk aan het e-mailadres. Opgeslagen als scrypt (N=32768, r=8, p=1, 16 bytes salt, 64 bytes hash); de parameters staan in de hash zodat ze later omhoog kunnen. |
+| Dubbel account | `409`. Dat verraadt dat een adres bestaat; bewuste afweging voor een duidelijke melding, beperkt door 10 registraties per uur per IP. Inloggen geeft voor onbekend adres en fout wachtwoord wél exact hetzelfde antwoord, en rekent in beide gevallen een hash uit. |
+| Sessies | 32 willekeurige bytes in een `HttpOnly; SameSite=Strict; Path=/`-cookie (`Secure` achter HTTPS), 30 dagen geldig. Op schijf alleen de SHA-256. Bij elke login een nieuw token. Uitloggen en intrekken werken direct. Max. 50 sessies per account. |
+| Sync-script | Krijgt via `POST /api/token` een apart token (een jaar geldig) dat alleen als `Authorization: Bearer` werkt; een browsercookie werkt niet als bearer en andersom. Het wachtwoord wordt nooit bewaard. |
+| CSRF | `SameSite=Strict`, plus: wijzigende verzoeken met een `Origin` van een andere host of `Sec-Fetch-Site: cross-site` krijgen `403`. |
+| Rate limits | Inloggen/token: 5 fouten en 30 pogingen in totaal (scrypt is duur) per IP per 15 min. Bewust geen harde grens per account: daarmee kan een vreemde de eigenaar buitensluiten; tegen raden over veel IPs heen helpt de wachtwoordeis van 12+ tekens. Oude PIN: 5 fouten per IP per 15 min en 20 in totaal per uur. Registreren: 10 per IP per uur. Onbekende bearer-tokens: 20 per IP per 15 min. Tellers staan in het geheugen en beginnen na een herstart opnieuw. |
+| Oude PIN | Een korte PIN is met veel accounts en IPs over dagen te raden, en de totale grens kan het overnemen een uur blokkeren. Neem de oude voortgang dus meteen na de update over en haal daarna `ACCESS_PIN` uit `.env`. |
+| Isolatie | Voortgang staat in `data/users/<id>/progress.json`; het ID is 32 hex-tekens van de server zelf en wordt gecontroleerd voordat er een pad van wordt gemaakt. Steam-sync gebruikt alleen de SteamID die bij het account is opgeslagen. |
+| Oude PIN-voortgang | Wordt aan niemand getoond. Overnemen kan één keer, met de juiste `ACCESS_PIN`, in een account zonder eigen voortgang. `data/legacy-claim.json` wordt exclusief aangemaakt, dus van gelijktijdige pogingen wint er één. |
+| Gelijktijdigheid | Lezen-aanpassen-schrijven per account loopt via een slot; bestanden worden atomisch geschreven (`0600`, map `0700`). Eén serverproces per datamap: accounts en sessies staan in het geheugen. |
+| Niet gedaan | Account verwijderen, wachtwoord wijzigen/vergeten, 2FA, e-mailverificatie. Wachtwoord vergeten = beheerder past `data/users.json` aan. Ingelogde accounts zien wél óf er nog oude voortgang over te nemen is (niet wat erin staat). |
 
 ## Bronnen
 

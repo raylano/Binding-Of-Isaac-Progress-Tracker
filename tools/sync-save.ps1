@@ -1,5 +1,5 @@
 <#
-  Stuurt je Isaac-save naar het Kelderdagboek, zonder browser.
+  Stuurt je Isaac-save naar het Kelderdagboek, zonder browser, naar jouw account.
 
   Voorbeelden:
     powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1
@@ -9,10 +9,13 @@
   -AfterGame        start Isaac via Steam, wacht tot je het spel afsluit en synchroniseert dan
   -InstallShortcut  zet een snelkoppeling "Isaac + sync" op je bureaublad die precies dat doet
   -Slot 2           een andere save-slot (1, 2 of 3)
-  -ResetPin         de opgeslagen PIN vergeten en opnieuw vragen
+  -ResetLogin       opnieuw inloggen (of een ander account kiezen)
 
-  De PIN wordt de eerste keer gevraagd en daarna versleuteld (Windows DPAPI, alleen
-  leesbaar voor jouw Windows-account) bewaard in %APPDATA%\boipt\pin.txt.
+  De eerste keer log je in met je e-mailadres en wachtwoord, of maak je een nieuw
+  account. Het wachtwoord wordt niet bewaard: de server geeft een eigen sync-token
+  voor deze pc, en dat staat versleuteld met Windows DPAPI (alleen leesbaar voor
+  jouw Windows-account) in %APPDATA%\boipt\account-<server>.xml. Intrekken kan op
+  de site onder Sync -> Account.
 #>
 param(
   [string]$Server = $(if ($env:BOIPT_SERVER) { $env:BOIPT_SERVER } else { 'https://isaac.wolfs.dev' }),
@@ -20,27 +23,76 @@ param(
   [string]$SavePath,
   [switch]$AfterGame,
   [switch]$InstallShortcut,
-  [switch]$ResetPin
+  [Alias('ResetPin')][switch]$ResetLogin
 )
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $Server = $Server.TrimEnd('/')
+if ($Server -notmatch '^https://' -and $Server -notmatch '^http://(localhost|127\.0\.0\.1)(:\d+)?$') {
+  throw "Gebruik https voor $Server; je wachtwoord en token gaan anders onversleuteld over het net."
+}
 
-function Get-Pin {
-  if ($env:BOIPT_PIN) { return $env:BOIPT_PIN }
-  $dir = Join-Path $env:APPDATA 'boipt'
-  $file = Join-Path $dir 'pin.txt'
-  if ($ResetPin -and (Test-Path $file)) { Remove-Item $file -Force }
-  if (-not (Test-Path $file)) {
-    New-Item -ItemType Directory -Force -Path $dir | Out-Null
-    $secure = Read-Host -AsSecureString 'PIN voor het Kelderdagboek'
-    $secure | ConvertFrom-SecureString | Set-Content -Path $file -Encoding ASCII
-  }
-  $secure = Get-Content $file | ConvertTo-SecureString
+$Dir = Join-Path $env:APPDATA 'boipt'
+$CredFile = Join-Path $Dir ("account-{0}.xml" -f (([Uri]$Server).Authority -replace '[^A-Za-z0-9.-]', '_'))
+
+function Get-Plain([Security.SecureString]$secure) {
   $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
   try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) }
   finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+}
+
+# POST met JSON; geeft @{ Status; Body } terug, ook bij 4xx.
+function Invoke-Json([string]$Path, $Data) {
+  $bytes = [Text.Encoding]::UTF8.GetBytes(($Data | ConvertTo-Json -Compress))
+  try {
+    $body = Invoke-RestMethod -Method Post -Uri "$Server/api/$Path" -Body $bytes -ContentType 'application/json; charset=utf-8'
+    return @{ Status = 200; Body = $body }
+  } catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    if (-not $code) { throw }
+    $msg = $null
+    try { $msg = ($_.ErrorDetails.Message | ConvertFrom-Json).error } catch { }
+    return @{ Status = $code; Body = @{ error = $msg } }
+  }
+}
+
+function New-Login {
+  Write-Host "Inloggen bij $Server" -ForegroundColor Cyan
+  $answer = Read-Host 'Heb je al een account? (j/n)'
+  $isNew = $answer -match '^[nN]'
+  $email = (Read-Host 'E-mailadres').Trim()
+  $password = Get-Plain (Read-Host -AsSecureString 'Wachtwoord (minstens 12 tekens)')
+  try {
+    if ($isNew) {
+      $again = Get-Plain (Read-Host -AsSecureString 'Nog een keer')
+      if ($again -ne $password) { throw 'De wachtwoorden zijn niet gelijk.' }
+      $again = $null
+      $reg = Invoke-Json 'register' @{ email = $email; password = $password }
+      if ($reg.Status -ne 200) { throw "Account maken mislukt: $($reg.Body.error)" }
+      Write-Host 'Account gemaakt.' -ForegroundColor Green
+    }
+    $res = Invoke-Json 'token' @{ email = $email; password = $password; label = $env:COMPUTERNAME }
+  } finally {
+    $password = $null
+  }
+  if ($res.Status -eq 429) { throw 'Te veel pogingen; wacht een kwartier.' }
+  if ($res.Status -ne 200) { throw "Inloggen mislukt: $($res.Body.error)" }
+  New-Item -ItemType Directory -Force -Path $Dir | Out-Null
+  # Export-Clixml versleutelt het wachtwoordveld (hier: het token) met DPAPI.
+  $secureToken = ConvertTo-SecureString $res.Body.token -AsPlainText -Force
+  New-Object Management.Automation.PSCredential ($email, $secureToken) | Export-Clixml -Path $CredFile
+  # De oude PIN van voor de accounts is niet meer nodig.
+  Remove-Item (Join-Path $Dir 'pin.txt') -Force -ErrorAction SilentlyContinue
+  Write-Host "Ingelogd als $email; deze pc synct voortaan naar dat account." -ForegroundColor Green
+}
+
+function Get-Token {
+  if ($env:BOIPT_TOKEN) { return $env:BOIPT_TOKEN }
+  if ($ResetLogin -and (Test-Path $CredFile)) { Remove-Item $CredFile -Force }
+  if (-not (Test-Path $CredFile)) { New-Login }
+  $cred = Import-Clixml -Path $CredFile
+  return Get-Plain $cred.Password
 }
 
 function Find-Save {
@@ -67,18 +119,23 @@ function Find-Save {
   return ($candidates | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
 }
 
-function Send-Save {
+function Send-Save([switch]$Retried) {
   $path = Find-Save
-  $pin = Get-Pin
+  $token = Get-Token
   Write-Host "Save: $path"
   Write-Host "Server: $Server"
   try {
     $res = Invoke-RestMethod -Method Post -Uri "$Server/api/save" -InFile $path `
-      -ContentType 'application/octet-stream' -Headers @{ Authorization = "Bearer $pin" }
+      -ContentType 'application/octet-stream' -Headers @{ Authorization = "Bearer $token" }
   } catch {
     $code = $_.Exception.Response.StatusCode.value__
-    if ($code -eq 401) { Write-Host 'Verkeerde PIN. Probeer opnieuw met -ResetPin.' -ForegroundColor Red; exit 1 }
-    if ($code -eq 429) { Write-Host 'Te veel pogingen; wacht een kwartier.' -ForegroundColor Red; exit 1 }
+    if ($code -eq 401 -and -not $Retried -and -not $env:BOIPT_TOKEN) {
+      Write-Host 'Je sync-token is verlopen of ingetrokken. Log opnieuw in.' -ForegroundColor Yellow
+      Remove-Item $CredFile -Force -ErrorAction SilentlyContinue
+      return Send-Save -Retried
+    }
+    if ($code -eq 401) { Write-Host 'Niet ingelogd. Probeer opnieuw met -ResetLogin.' -ForegroundColor Red; exit 1 }
+    if ($code -eq 429) { Write-Host 'Te veel pogingen; wacht even.' -ForegroundColor Red; exit 1 }
     throw
   }
   $new = @($res.gained).Count
@@ -96,12 +153,14 @@ if ($InstallShortcut) {
   try { $steamExe = (Get-ItemProperty 'HKCU:\Software\Valve\Steam' -Name SteamExe).SteamExe } catch { }
   if ($steamExe) { $sc.IconLocation = $steamExe }
   $sc.Save()
-  Get-Pin | Out-Null
+  Get-Token | Out-Null
   Write-Host "Snelkoppeling gemaakt: $lnk" -ForegroundColor Green
   exit 0
 }
 
 if ($AfterGame) {
+  # Eerst inloggen, zodat er na het spelen niets meer gevraagd hoeft te worden.
+  Get-Token | Out-Null
   $running = Get-Process -Name 'isaac-ng' -ErrorAction SilentlyContinue
   if (-not $running) {
     Write-Host 'Isaac starten via Steam...'

@@ -127,3 +127,51 @@ test('snelle winst: 399/400 munten in de Donation-machine', () => {
   const s = state([134, 135, 136, 151, 152, 153], { counters: { donation: 399 } });
   assert.ok(quickWins(model, s).some((q) => q.id === 137 && q.left === 1));
 });
+
+test('unlock-uitleg: elke route-achievement heeft een eigen uitleg, geen fallback', async () => {
+  const { effectOf } = await import('../web/js/logic.js');
+  const { UNLOCK_EFFECTS, UNLOCK_FALLBACK } = await import('../web/data/unlock-effects.js');
+  const ids = [...new Set(ROUTE.flatMap((s) => s.ach))];
+  for (const id of ids) {
+    const name = `#${id} ${model.byId.get(id).name}`;
+    assert.ok(id in UNLOCK_EFFECTS, `${name} mist uitleg`);
+    assert.ok(!(id in UNLOCK_FALLBACK), `${name} staat nog in UNLOCK_FALLBACK`);
+    const e = effectOf(model, id);
+    assert.equal(e.known, true, name);
+    assert.ok(e.text.length > 15, name);
+  }
+  // Meerdere achievements in één stap krijgen elk hun eigen tekst.
+  for (const s of ROUTE.filter((r) => r.ach.length > 1)) {
+    const known = s.ach.filter((id) => id in UNLOCK_EFFECTS).map((id) => effectOf(model, id).text);
+    assert.equal(new Set(known).size, known.length, s.key);
+  }
+});
+
+test('unlock-uitleg: bekende items en personages krijgen specifieke werking', async () => {
+  const { effectOf } = await import('../web/js/logic.js');
+  const item = effectOf(model, 6);
+  assert.equal(item.known, true);
+  assert.match(item.text, /Cube of Meat/);
+  assert.match(item.text, /familiar|orbitaal/i);
+  const character = effectOf(model, 1);
+  assert.equal(character.known, true);
+  assert.match(character.text, /Magdalene/);
+  assert.match(character.text, /hartcontainers/i);
+});
+
+test('unlock-uitleg: onbekende ID houdt een veilige wiki-fallback', async () => {
+  const { effectOf } = await import('../web/js/logic.js');
+  const missing = effectOf(model, 99999);
+  assert.equal(missing.known, false);
+  assert.match(missing.text, /wiki/i);
+});
+
+test('unlock-uitleg: alle 641 achievements hebben een eigen uitleg zonder placeholder', async () => {
+  const { effectOf } = await import('../web/js/logic.js');
+  const missing = [];
+  for (const a of data) {
+    const e = effectOf(model, a.id);
+    if (!e.known || /Nog geen uitleg|zie de wiki|Zie de wiki/.test(e.text) || e.text.length < 20) missing.push(`#${a.id} ${a.name}`);
+  }
+  assert.deepEqual(missing.slice(0, 20), [], `${missing.length} zonder uitleg`);
+});

@@ -25,11 +25,15 @@ after(() => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-const login = (pin) => fetch(`${base}/api/login`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ pin }),
-});
+async function account() {
+  const res = await fetch(`${base}/api/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'server@example.com', password: 'een prima wachtwoord' }),
+  });
+  assert.equal(res.status, 201);
+  return res.headers.get('set-cookie');
+}
 
 test('zonder cookie: 401 op voortgang en config', async () => {
   assert.equal((await fetch(`${base}/api/progress`)).status, 401);
@@ -44,12 +48,11 @@ test('statische pagina laadt met veiligheidsheaders', async () => {
   assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
 });
 
-test('goede PIN: cookie, en daarmee voortgang lezen en schrijven', async () => {
-  const res = await login('4242');
-  assert.equal(res.status, 200);
-  const cookie = res.headers.get('set-cookie').split(';')[0];
-  assert.match(res.headers.get('set-cookie'), /HttpOnly/);
-  assert.match(res.headers.get('set-cookie'), /SameSite=Strict/);
+test('account: cookie, en daarmee voortgang lezen en schrijven', async () => {
+  const setCookie = await account();
+  const cookie = setCookie.split(';')[0];
+  assert.match(setCookie, /HttpOnly/);
+  assert.match(setCookie, /SameSite=Strict/);
 
   const put = await fetch(`${base}/api/progress`, {
     method: 'PUT',
@@ -69,22 +72,17 @@ test('goede PIN: cookie, en daarmee voortgang lezen en schrijven', async () => {
   });
   assert.equal(stale.status, 409);
   assert.deepEqual((await stale.json()).current.achievements, [1, 2]);
-
-  const cfg = await (await fetch(`${base}/api/config`, { headers: { cookie } })).json();
-  assert.equal(cfg.accountId, '22202');
 });
 
 test('save-upload: geen save = 400, te groot = 413', async () => {
-  const auth = { Authorization: 'Bearer 4242' };
+  const res = await fetch(`${base}/api/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'server@example.com', password: 'een prima wachtwoord' }),
+  });
+  const auth = { Authorization: `Bearer ${(await res.json()).token}` };
   const bad = await fetch(`${base}/api/save`, { method: 'POST', headers: auth, body: 'x'.repeat(200) });
   assert.equal(bad.status, 400);
   const big = await fetch(`${base}/api/save`, { method: 'POST', headers: auth, body: new Uint8Array(70 * 1024) });
   assert.equal(big.status, 413);
-});
-
-test('na 5 foute PINs: 429', async () => {
-  const codes = [];
-  for (let i = 0; i < 6; i++) codes.push((await login('0000')).status);
-  assert.deepEqual(codes.slice(0, 5), [401, 401, 401, 401, 401]);
-  assert.equal(codes[5], 429);
 });

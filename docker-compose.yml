@@ -8,11 +8,11 @@ services:
     ports:
       - "127.0.0.1:${PORT:-8090}:8080"
     volumes:
-      # progress.json blijft hier staan, ook na een rebuild
+      # accounts, sessies en voortgang blijven hier staan, ook na een rebuild
       - ./data:/data
     environment:
-      ACCESS_PIN: "${ACCESS_PIN:?Zet ACCESS_PIN in .env}"
-      SESSION_SECRET: "${SESSION_SECRET:-}"
+      # Alleen nodig om de oude voortgang van vóór de accounts over te nemen.
+      ACCESS_PIN: "${ACCESS_PIN:-}"
       STEAM_ID: "${STEAM_ID:-}"
       STEAM_API_KEY: "${STEAM_API_KEY:-}"
       TRUST_PROXY: "${TRUST_PROXY:-1}"

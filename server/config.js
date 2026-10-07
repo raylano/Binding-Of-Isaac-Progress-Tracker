@@ -1,6 +1,5 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -26,27 +25,14 @@ export const config = {
   steamKey: env.STEAM_API_KEY || '',
   // Achter nginx komt het echte IP uit X-Forwarded-For. Lokaal zonder proxy: 0.
   trustProxy: env.TRUST_PROXY === undefined ? 1 : Number(env.TRUST_PROXY),
+  // Browsersessies; sync-tokens gelden een jaar (zie accounts.js).
   sessionDays: 30,
 };
 
 fs.mkdirSync(config.dataDir, { recursive: true });
 
-// Sessiegeheim: uit .env, of eenmalig gegenereerd en bewaard in de datamap zodat
-// een herstart je niet uitlogt.
-function sessionSecret() {
-  if (env.SESSION_SECRET) return env.SESSION_SECRET;
-  const file = path.join(config.dataDir, '.session-secret');
-  try {
-    return fs.readFileSync(file, 'utf8').trim();
-  } catch {
-    const secret = crypto.randomBytes(32).toString('hex');
-    fs.writeFileSync(file, secret, { mode: 0o600 });
-    return secret;
-  }
-}
-
-config.secret = sessionSecret();
-
-if (!config.pin) {
-  console.warn('!! ACCESS_PIN ontbreekt in .env: niemand kan inloggen tot je hem invult.');
+// ACCESS_PIN is alleen nog nodig om de voortgang van vóór de accounts
+// (data/progress.json) één keer over te nemen. Leeg = die overname staat uit.
+if (!config.pin && fs.existsSync(path.join(config.dataDir, 'progress.json'))) {
+  console.warn('!! data/progress.json bestaat maar ACCESS_PIN is leeg: de oude voortgang kan niet worden overgenomen.');
 }

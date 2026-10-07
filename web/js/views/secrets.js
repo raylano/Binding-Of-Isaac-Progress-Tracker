@@ -1,7 +1,7 @@
 import { store, mutate } from '../store.js';
 import { CHARACTERS, CHAR_BY_KEY } from '../../data/characters.js';
 import { AVOID, SOURCES } from '../../data/route.js';
-import { achStatus, blockerChain, setAchievement, describeReq, howOf, GATES } from '../logic.js';
+import { achStatus, blockerChain, setAchievement, describeReq, howOf, effectOf, GATES } from '../logic.js';
 import { esc, achIcon, statusBadge, bar, openDrawer, drawerOpen, unlockedToasts, markName } from '../ui.js';
 import { chainHtml } from './characters.js';
 
@@ -148,12 +148,15 @@ function renderDrawer(fresh) {
   const avoid = AVOID[a.id];
   const mark = model.markOf.get(a.id);
   const gate = GATES[a.id];
+  const effect = effectOf(model, a.id);
   const chain = st.status === 'locked' ? chainHtml(model, blockerChain(model, state, a.id)) : '';
   const wiki = a.page ? `https://bindingofisaacrebirth.wiki.gg/wiki/${encodeURIComponent(a.page.replace(/ /g, '_'))}` : SOURCES.WIKI.url;
   const html = `
     <section class="paper tape">
       <div class="note-head">${achIcon(model, a.id, st.status === 'done' ? '' : st.status)}<div><div class="n" style="font-size:24px">${esc(a.name)}</div><div class="c">#${a.id} · ${statusBadge(st.status)}</div></div></div>
       <p class="muted"><i>${esc(a.unlock)}</i></p>
+      <h4>Wat het doet</h4>
+      <p${effect.known ? '' : ' class="muted"'}>${esc(effect.text)}</p>
       <h4>Hoe</h4>
       <p>${esc(howOf(model, a.id))}</p>
       ${a.note ? `<p class="muted">${esc(a.note)}</p>` : ''}

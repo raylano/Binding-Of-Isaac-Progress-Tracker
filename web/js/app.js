@@ -67,8 +67,8 @@ function render() {
   renderHud();
 }
 
-// ---------- Slot ----------
-let pinLength = 4;
+// ---------- Slot: inloggen of registreren ----------
+let authMode = 'login';
 function showLock(message = '') {
   closeDrawer(true);
   $('#hud').hidden = true;
@@ -77,51 +77,53 @@ function showLock(message = '') {
   current = null;
   const lock = $('#lock');
   lock.hidden = false;
-  const input = $('#pin-input');
-  lock.querySelector('.pin-dots').innerHTML = '<i></i>'.repeat(Math.min(Math.max(pinLength, 1), 12));
-  const dots = [...lock.querySelectorAll('.pin-dots i')];
+  const form = $('#auth-form');
   const err = $('#pin-err');
   err.textContent = message;
-  input.value = '';
-  const paint = () => dots.forEach((d, i) => d.classList.toggle('on', i < input.value.length));
-  paint();
+  form.password.value = '';
 
-  const submit = async (e) => {
-    e?.preventDefault();
-    if (!input.value) return;
+  const setMode = (mode) => {
+    authMode = mode;
+    for (const b of lock.querySelectorAll('[data-mode]')) b.setAttribute('aria-selected', String(b.dataset.mode === mode));
+    $('#auth-hint').hidden = mode !== 'register';
+    form.password.autocomplete = mode === 'register' ? 'new-password' : 'current-password';
+    $('#auth-submit').textContent = mode === 'register' ? 'Account maken' : 'Naar binnen';
+    $('#auth-intro').textContent = mode === 'register'
+      ? 'Maak een account; je voortgang is alleen van jou.'
+      : 'Log in om je eigen kelder in te gaan.';
+  };
+  setMode(authMode);
+  lock.querySelector('.auth-tabs').onclick = (e) => {
+    const b = e.target.closest('[data-mode]');
+    if (b) { setMode(b.dataset.mode); err.textContent = ''; }
+  };
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const email = form.email.value.trim();
+    const password = form.password.value;
+    if (!email || !password) { err.textContent = 'Vul je e-mailadres en wachtwoord in.'; return; }
+    $('#auth-submit').disabled = true;
     try {
-      await api('/login', {
+      await api(authMode === 'register' ? '/register' : '/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin: input.value }),
+        body: JSON.stringify({ email, password }),
       });
+      form.password.value = '';
       lock.hidden = true;
       start();
     } catch (ex) {
       err.textContent = ex.message;
-      input.value = '';
-      paint();
+      form.password.value = '';
       lock.querySelector('.door').classList.remove('shake');
       void lock.offsetWidth;
       lock.querySelector('.door').classList.add('shake');
+    } finally {
+      $('#auth-submit').disabled = false;
     }
   };
-
-  lock.onclick = (e) => {
-    const b = e.target.closest('[data-k]');
-    if (!b) return;
-    if (b.dataset.k === 'back') input.value = input.value.slice(0, -1);
-    else if (input.value.length < 12) input.value += b.dataset.k;
-    paint();
-    if (input.value.length === pinLength) submit();
-  };
-  $('#pin-form').onsubmit = submit;
-  document.onkeydown = (e) => {
-    if (lock.hidden) return;
-    if (/^\d$/.test(e.key)) { input.value += e.key; paint(); if (input.value.length === pinLength) submit(); }
-    else if (e.key === 'Backspace') { input.value = input.value.slice(0, -1); paint(); }
-    else if (e.key === 'Enter') submit();
-  };
+  (form.email.value ? form.password : form.email).focus();
 }
 
 let started = false;
@@ -161,11 +163,6 @@ async function start() {
 (async function boot() {
   try {
     const s = await api('/session');
-    pinLength = s.pinLength || 4;
-    if (!s.configured) {
-      showLock('Er is nog geen PIN ingesteld op de server (ACCESS_PIN in .env).');
-      return;
-    }
     if (!s.authed) return showLock();
     start();
   } catch (err) {

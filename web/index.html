@@ -55,17 +55,18 @@
         </g>
       </svg>
       <h1>Deze deur is op slot</h1>
-      <p>Toets je code in om de kelder in te gaan.</p>
-      <div class="pin-dots" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-      <form id="pin-form" autocomplete="off">
-        <label class="sr" for="pin-input">PIN</label>
-        <input id="pin-input" class="sr" inputmode="numeric" maxlength="12" autocomplete="current-password" type="password">
-        <div class="pin-pad">
-          <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
-          <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button>
-          <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button>
-          <button type="button" data-k="back" aria-label="Wissen">&larr;</button><button type="button" data-k="0">0</button><button type="submit" aria-label="Openen">&#10003;</button>
-        </div>
+      <p id="auth-intro">Log in om je eigen kelder in te gaan.</p>
+      <div class="auth-tabs" role="tablist">
+        <button type="button" role="tab" data-mode="login" aria-selected="true">Inloggen</button>
+        <button type="button" role="tab" data-mode="register" aria-selected="false">Nieuw account</button>
+      </div>
+      <form id="auth-form" class="auth-form" novalidate>
+        <label for="auth-email">E-mailadres</label>
+        <input id="auth-email" name="email" type="email" autocomplete="username" maxlength="254" required>
+        <label for="auth-password">Wachtwoord</label>
+        <input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required>
+        <p class="auth-hint" id="auth-hint" hidden>Minstens 12 tekens. Een zin van een paar woorden werkt prima.</p>
+        <button type="submit" class="btn blood" id="auth-submit">Naar binnen</button>
       </form>
       <div class="pin-err" id="pin-err" role="alert"></div>
     </div>
@@ -73,7 +74,7 @@
 
   <header class="hud" id="hud" hidden>
     <div class="hud-row">
-      <a class="logo" href="#/">Kelderdagboek<small>Repentance+ voortgang</small></a>
+      <a class="logo" href="#/">ApenBoek<small>Repentance+ voortgang</small></a>
       <div class="hearts" id="hud-hearts" aria-hidden="true"></div>
       <div class="stats" id="hud-stats"></div>
       <div class="hud-spacer"></div>

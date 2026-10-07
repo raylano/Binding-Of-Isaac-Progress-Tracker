@@ -40,14 +40,16 @@ cp .env.example .env
 nano .env
 ```
 
-Vul minimaal in:
+Iedereen maakt op de site zelf een account (e-mail + wachtwoord); er hoeft dus niets
+verplicht in `.env`. Alleen als er nog voortgang van vóór de accounts in
+`data/progress.json` staat, laat je daar de oude PIN staan:
 
 ```
-ACCESS_PIN=<jouw PIN>
+ACCESS_PIN=<je oude PIN>
 ```
 
-`SESSION_SECRET` mag leeg blijven; dan maakt de server er zelf een en bewaart die in
-`data/.session-secret`. Wil je hem zelf zetten: `openssl rand -hex 32`.
+Daarmee kan de eigenaar die voortgang één keer naar zijn account halen (zie
+*8. Van PIN naar accounts*). `SESSION_SECRET` wordt niet meer gebruikt.
 
 ---
 
@@ -85,7 +87,7 @@ server {
 
     client_max_body_size 1m;
 
-    location /api/login {
+    location ~ ^/api/(login|register|token|legacy/claim)$ {
         limit_req zone=boipt burst=5 nodelay;
         proxy_pass http://127.0.0.1:8090;
         include /etc/nginx/proxy_params;
@@ -117,7 +119,7 @@ HTTPS via Let's Encrypt (zelfde als Wolfs.dev):
 sudo certbot --nginx -d isaac.wolfs.dev
 ```
 
-Open daarna **https://isaac.wolfs.dev**, toets je PIN in en lees je save in via *Sync*.
+Open daarna **https://isaac.wolfs.dev**, maak een account en lees je save in via *Sync*.
 
 ---
 
@@ -129,17 +131,19 @@ Op je pc: committen en pushen. Op de server:
 cd ~/BOIPT && git pull && docker compose up -d --build
 ```
 
-Je voortgang staat in `data/progress.json` en blijft gewoon staan.
+Accounts, sessies en voortgang staan in `data/` en blijven gewoon staan.
 
 ---
 
 ## 6. Back-up
 
-Eén bestand:
+De hele datamap (accounts, sessies, voortgang per account):
 
 ```bash
-cp ~/BOIPT/data/progress.json ~/boipt-backup-$(date +%F).json
+tar czf ~/boipt-backup-$(date +%F).tgz -C ~/BOIPT data
 ```
+
+Bewaar die back-up net zo zorgvuldig als de server: er staan wachtwoord-hashes in.
 
 In de site zelf kan het ook: *Sync → Download back-up*.
 
@@ -147,18 +151,38 @@ In de site zelf kan het ook: *Sync → Download back-up*.
 
 ## 7. Save automatisch insturen vanaf je pc
 
-Eenmalig een snelkoppeling maken (vraagt één keer je PIN en bewaart die versleuteld):
+Eenmalig een snelkoppeling maken. De eerste keer log je in (of maak je een account);
+het script bewaart geen wachtwoord, alleen een eigen sync-token voor deze pc,
+versleuteld met Windows DPAPI in `%APPDATA%\boipt\account-<server>.xml`:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1 -InstallShortcut
 ```
 
 Start Isaac voortaan met **Isaac + sync** op je bureaublad: zodra je het spel afsluit,
-staat je nieuwe stand online. Handmatig kan ook:
+staat je nieuwe stand online in jouw account. Handmatig kan ook:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1
 ```
+
+Ander account of opnieuw inloggen: `-ResetLogin`. Een pc kwijt? Trek zijn sync-token in
+op de site onder *Sync → Account*.
+
+---
+
+## 8. Van PIN naar accounts
+
+Wie de site al met de PIN gebruikte, neemt zijn voortgang zo over:
+
+1. Laat `ACCESS_PIN` in `.env` staan en werk bij (zie 5).
+2. Maak op de site een **nieuw** account.
+3. *Sync → Account → Oude voortgang overnemen*: vul de oude PIN in.
+
+Dat kan precies één keer, en alleen in een account zonder eigen voortgang.
+`data/legacy-claim.json` legt vast welk account het was; `data/progress.json` blijft als
+back-up staan maar wordt nergens meer getoond. Doe dit meteen na de update en haal daarna `ACCESS_PIN` uit `.env` (een korte PIN is anders op den duur te raden).
+Het oude sync-script (met PIN) werkt niet meer: draai het nieuwe één keer om in te loggen.
 
 ---
 
@@ -166,10 +190,12 @@ powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1
 
 | Wat je ziet | Oorzaak |
 |---|---|
-| "Deze deur is op slot" blijft na de juiste PIN | Cookie geweigerd: draait de site via HTTPS en geeft nginx `X-Forwarded-Proto` door? |
-| "Te veel foute pogingen" | 5 foute PINs binnen 15 minuten; wacht een kwartier. |
+| "Deze deur is op slot" blijft na het inloggen | Cookie geweigerd: draait de site via HTTPS en geeft nginx `X-Forwarded-Proto` door? |
+| "Verzoek van een andere site geweigerd" | nginx geeft de `Host`-header niet door (`include /etc/nginx/proxy_params`). |
+| "Te veel foute pogingen" | 5 foute wachtwoorden of 30 pogingen per IP binnen 15 minuten; wacht een kwartier. |
+| Overnemen hing (crash halverwege) | `data/legacy-claim.json` staat er, maar het account heeft niets. Verwijder dat bestand en probeer opnieuw. |
+| Oude voortgang overnemen staat er niet | `ACCESS_PIN` is leeg, er is geen `data/progress.json`, of hij is al overgenomen. |
 | Steam-sync zegt 0 | In Steam: *Profiel bewerken → Privacy → Game details: Openbaar*. |
-| Container start niet: `ACCESS_PIN` | De PIN ontbreekt in `.env`. |
 
 Logs bekijken:
 

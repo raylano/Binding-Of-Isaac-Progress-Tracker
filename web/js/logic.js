@@ -9,6 +9,7 @@
 import {
   MARKS, MARK_INDEX, MARK_REQUIRES, GREEDIER, CHARACTERS, CHAR_BY_KEY,
 } from '../data/characters.js';
+import { UNLOCK_EFFECTS, UNLOCK_FALLBACK } from '../data/unlock-effects.js';
 
 export const LEVEL = { none: 0, normal: 1, hard: 2 };
 
@@ -299,6 +300,28 @@ function meets(model, state, r) {
 // Uitleg hoe je iets haalt: een eigen tekst waar de wiki-regel te kort is.
 export function howOf(model, id) {
   return GATES[id]?.how || model.byId.get(id)?.how || '';
+}
+
+// Wat de unlock in het spel doet. Zonder eigen uitleg: het soort unlock (uit
+// UNLOCK_FALLBACK of de wiki-tekst) of anders de letterlijke wiki-tekst, plus een
+// verwijzing naar de wiki. Ruwe tekst; escapen bij renderen.
+const KIND_TEXT = {
+  item: 'Ontgrendelt een nieuw item.',
+  rune: 'Ontgrendelt een nieuwe rune.',
+  character: 'Ontgrendelt een nieuw speelbaar personage.',
+  start: 'Ontgrendelt een nieuw startitem.',
+  area: 'Ontgrendelt een nieuw gebied.',
+  unknown: 'Ontgrendelt iets nieuws.',
+};
+const WIKI_KIND = { item: 'item', character: 'character', 'starting item': 'start', area: 'area' };
+const SEE_WIKI = 'Het precieze effect staat nog niet in de app; zie de wiki-pagina.';
+export function effectOf(model, id) {
+  if (UNLOCK_EFFECTS[id]) return { known: true, text: UNLOCK_EFFECTS[id] };
+  const unlock = (model.byId.get(id)?.unlock || '').trim();
+  const kind = UNLOCK_FALLBACK[id]?.kind || WIKI_KIND[/^unlocked a new (.+?)\.?$/i.exec(unlock)?.[1].toLowerCase()];
+  if (kind) return { known: false, text: `${KIND_TEXT[kind]} ${SEE_WIKI}` };
+  if (unlock && unlock !== '???') return { known: false, text: `Wiki-omschrijving: "${unlock}" ${SEE_WIKI}` };
+  return { known: false, text: 'Nog geen uitleg in de app; zie de wiki-pagina.' };
 }
 
 export function describeReq(model, r) {

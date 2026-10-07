@@ -7,6 +7,7 @@ import { esc, toast, modal, timeAgo, unlockedToasts, markName } from '../ui.js';
 
 let remembered = null;
 let steamMsg = '';
+let sessions = null;
 
 function saveDir() {
   const id = store.config.accountId || '<account-ID>';
@@ -16,6 +17,7 @@ function saveDir() {
 export async function mount(root) {
   root.addEventListener('click', onClick);
   root.addEventListener('change', onChange);
+  root.addEventListener('submit', onSubmit);
   root.addEventListener('dragover', (e) => { if (e.target.closest('.drop')) { e.preventDefault(); e.target.closest('.drop').classList.add('over'); } });
   root.addEventListener('dragleave', (e) => e.target.closest('.drop')?.classList.remove('over'));
   root.addEventListener('drop', async (e) => {
@@ -28,6 +30,30 @@ export async function mount(root) {
   });
   remembered = await storedHandle();
   update(root);
+  loadSessions(root);
+}
+
+async function loadSessions(root) {
+  try {
+    sessions = (await api('/sessions')).sessions;
+  } catch {
+    sessions = null;
+  }
+  update(root);
+}
+
+function device(ua = '') {
+  const browser = ua.match(/Edg|Firefox|Chrome|Safari/)?.[0]?.replace('Edg', 'Edge');
+  const os = ua.match(/Windows|Android|iPhone|iPad|Mac OS|Linux/)?.[0]?.replace('Mac OS', 'Mac');
+  return [browser, os].filter(Boolean).join(' op ') || 'Browser';
+}
+
+function sessionsHtml() {
+  if (!sessions) return '<p class="muted">Sessies laden…</p>';
+  return `<ul class="session-list">${sessions.map((s) => `
+    <li><span>${s.kind === 'sync' ? `Sync-script: ${esc(s.label || '')}` : esc(device(s.userAgent))}
+      <small class="muted"> · ${timeAgo(s.lastSeen)} geleden actief${s.current ? ' · <b>dit apparaat</b>' : ''}</small></span>
+      ${s.current ? '' : `<button type="button" class="btn small ghost" data-act="revoke" data-id="${esc(s.id)}">Intrekken</button>`}</li>`).join('')}</ul>`;
 }
 
 export function unmount() {}
@@ -43,7 +69,7 @@ export function update(root) {
     <div class="grid cols-2">
       <section class="paper tape tilt-l">
         <h3>Save-bestand</h3>
-        <p class="muted">${s.save ? `Laatst ingelezen ${timeAgo(s.save.at)} geleden (${esc(s.save.edition || '')}, ${s.save.achievements} geheimen).` : 'Nog nooit ingelezen.'}</p>
+        <p class="muted">${s.save ? `Laatst ingelezen ${timeAgo(s.save.at)} geleden (${esc(s.save.edition || '')}, ${esc(s.save.achievements)} geheimen).` : 'Nog nooit ingelezen.'}</p>
         <div class="row">
           <button type="button" class="btn blood" data-act="sync-save">${remembered ? 'Sync save' : 'Kies je save'}</button>
           ${remembered ? '<button type="button" class="btn small ghost" data-act="forget">Ander bestand</button>' : ''}
@@ -58,10 +84,15 @@ export function update(root) {
 
       <section class="paper tilt-r">
         <h3>Steam</h3>
-        <p class="muted">${s.steam ? `Laatst ${timeAgo(s.steam.at)} geleden: ${s.steam.count} achievements.` : 'Nog niet gebruikt.'}</p>
+        <p class="muted">${s.steam ? `Laatst ${timeAgo(s.steam.at)} geleden: ${esc(s.steam.count)} achievements.` : 'Nog niet gebruikt.'}</p>
         <p>Haalt je Steam-achievements op en vinkt af wat nog ontbrak. Zet nooit iets terug; marks hooguit op normal.</p>
         <p class="muted">Werkt alleen als in Steam <b>Profiel bewerken → Privacy → Game details</b> op <b>Openbaar</b> staat.${store.config.steamKey ? '' : ' (Zonder STEAM_API_KEY gebruikt de server de publieke profielpagina.)'}</p>
-        <button type="button" class="btn" data-act="steam">Sync Steam</button>
+        <form class="row" data-form="steam-id">
+          <label class="sr" for="steam-id">SteamID64</label>
+          <input id="steam-id" name="steamId" inputmode="numeric" maxlength="17" placeholder="SteamID64 (7656119…)" value="${esc(store.config.steamId || '')}">
+          <button type="submit" class="btn small ghost">Bewaar</button>
+        </form>
+        ${store.config.steamId ? '<button type="button" class="btn" data-act="steam">Sync Steam</button>' : '<p class="muted">Vul eerst je SteamID64 in (te vinden op steamid.io).</p>'}
         <div id="steam-out">${steamMsg}</div>
       </section>
 
@@ -69,7 +100,7 @@ export function update(root) {
         <h3>Automatisch na het spelen</h3>
         <p>Het script <code>tools/sync-save.ps1</code> stuurt je save zonder browser naar deze site. Met <code>-AfterGame</code> start het Isaac en synchroniseert het zodra je het spel sluit.</p>
         <pre class="cmd">powershell -ExecutionPolicy Bypass -File tools\\sync-save.ps1 -Server ${esc(origin)} -AfterGame</pre>
-        <p class="muted">De PIN vraagt het script één keer; die wordt versleuteld voor jouw Windows-account bewaard. Maak er een snelkoppeling "Isaac + sync" van en je hoeft nooit meer te importeren.</p>
+        <p class="muted">De eerste keer log je in het script in (of maak je daar een account). Je wachtwoord wordt niet bewaard: het script krijgt een eigen sync-token, versleuteld voor jouw Windows-account (DPAPI). Saves gaan alleen naar dit account. Maak er een snelkoppeling "Isaac + sync" van met <code>-InstallShortcut</code>.</p>
       </section>
 
       <section class="paper">
@@ -79,6 +110,21 @@ export function update(root) {
           <button type="button" class="btn" data-act="export">Download back-up</button>
           <label class="btn ghost">Back-up terugzetten<input type="file" accept="application/json,.json" data-backup class="sr"></label>
         </div>
+      </section>
+
+      <section class="paper">
+        <h3>Account</h3>
+        <p>Ingelogd als <b>${esc(store.session.user?.email || store.config.email || '')}</b>.</p>
+        <h4>Waar je bent ingelogd</h4>
+        ${sessionsHtml()}
+        ${store.session.legacy?.available ? `
+        <h4>Oude voortgang overnemen</h4>
+        <p class="muted">Gebruikte je deze site al met de PIN? Neem die voortgang één keer over naar dit account. Dat kan alleen met de oude PIN en alleen in een account zonder eigen voortgang.</p>
+        <form class="row" data-form="claim">
+          <label class="sr" for="claim-pin">Oude PIN</label>
+          <input id="claim-pin" name="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="32" placeholder="Oude PIN">
+          <button type="submit" class="btn small blood">Overnemen</button>
+        </form>` : ''}
         <hr>
         <button type="button" class="btn small ghost" data-act="logout">Uitloggen</button>
       </section>
@@ -126,11 +172,40 @@ async function onClick(e) {
       a.download = `kelderdagboek-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    } else if (act === 'revoke') {
+      await api(`/sessions/${encodeURIComponent(b.dataset.id)}`, { method: 'DELETE' });
+      await loadSessions(root);
     } else if (act === 'logout') {
       await api('/logout', { method: 'POST' });
       location.reload();
     }
   } catch (err) {
+    toast({ kicker: 'MISLUKT', title: err.message });
+  }
+}
+
+async function onSubmit(e) {
+  const form = e.target.closest('[data-form]');
+  if (!form) return;
+  e.preventDefault();
+  const root = e.currentTarget;
+  const post = (path, method, body) => api(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  try {
+    if (form.dataset.form === 'steam-id') {
+      const res = await post('/account', 'PUT', { steamId: form.steamId.value.trim() || null });
+      store.config = { ...store.config, steamId: res.steamId, accountId: res.accountId };
+      toast({ kicker: 'BEWAARD', title: res.steamId ? 'SteamID staat erin' : 'SteamID gewist' });
+      update(root);
+    } else if (form.dataset.form === 'claim') {
+      const res = await post('/legacy/claim', 'POST', { pin: form.pin.value });
+      form.pin.value = '';
+      store.session = { ...store.session, legacy: { available: false } };
+      store.config = await api('/config');
+      replaceState(res.progress, 'claim');
+      toast({ kicker: 'OVERGENOMEN', title: 'Je oude voortgang staat nu in dit account' });
+    }
+  } catch (err) {
+    if (form.pin) form.pin.value = '';
     toast({ kicker: 'MISLUKT', title: err.message });
   }
 }
