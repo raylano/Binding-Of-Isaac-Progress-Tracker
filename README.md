@@ -1,7 +1,49 @@
 # BasementDiary
 
-Progress tracker for **The Binding of Isaac: Repentance+**, styled after the game:
-a dark basement, paper notes and a pixel HUD.
+A self-hosted progress tracker for **The Binding of Isaac: Repentance+**, styled after the
+game: a dark basement, paper notes and a pixel HUD.
+
+BasementDiary reads your real save file, works out what each unlock depends on, and tells
+you which run pays off most next. You can use it for every achievement, character and
+completion mark, from the first run to Dead God. Every account keeps its own progress, and
+on Windows your save can sync by itself each time you quit the game.
+
+> **Status:** version 1.0.0 &nbsp;·&nbsp; **License:** [PolyForm Noncommercial 1.0.0](LICENSE)
+> (application code only; see [License](#license)) &nbsp;·&nbsp; Fan project, not affiliated
+> with Nicalis or Edmund McMillen.
+
+**Requirements**
+
+| To… | You need |
+|---|---|
+| Self-host | A Linux server with Docker and Docker Compose, a domain, and an HTTPS reverse proxy (e.g. nginx with Let's Encrypt) |
+| Develop locally | Node.js 20 or newer |
+| Sync automatically | Windows with Windows PowerShell 5.1 (built into Windows 10/11), and The Binding of Isaac: Rebirth + Repentance+ on Steam |
+
+## Contents
+
+- [Screenshots](#screenshots)
+- [Features](#features)
+- [Playing Isaac with automatic sync (Windows)](#playing-isaac-with-automatic-sync-windows)
+- [Self-hosting on Linux (quickstart)](#self-hosting-on-linux-quickstart)
+- [Local development](#local-development)
+- [Tests](#tests)
+- [Data generation](#data-generation)
+- [Project layout](#project-layout)
+- [Configuration](#configuration)
+- [Accounts and security](#accounts-and-security)
+- [Limitations](#limitations)
+- [License](#license)
+- [Sources](#sources)
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/basementdiary-login.png" alt="BasementDiary login screen: a locked wooden door with a padlock above the heading 'This door is locked' and email and password fields" width="720">
+</p>
+<p align="center"><em>The public login screen. Everything else is behind an account.</em></p>
+
+## Features
 
 - **All your unlocks**: 641 achievements, 34 characters, 408 completion marks (normal and hard).
 - **Real dependencies**: every unlock knows what it needs. Downpour only opens after
@@ -60,7 +102,8 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-Edit `.env` (placeholders only; never commit real values):
+Edit `.env` (placeholders only; never commit real values). Set `PUBLIC_URL` to your own
+public origin; `https://your-domain.example` is only a placeholder:
 
 ```
 PUBLIC_URL=https://your-domain.example
@@ -87,7 +130,7 @@ until the admin opens it under *Sync → Admin*.
 
 For the full nginx/TLS, DNS, update and backup instructions see [DEPLOY.md](DEPLOY.md).
 
-## Running locally
+## Local development
 
 Requires Node.js 20 or newer.
 
@@ -135,7 +178,7 @@ With your real save as well (never committed):
 ISAAC_SAVE="C:/Program Files (x86)/Steam/userdata/<id>/250900/remote/rep+persistentgamedata1.dat" npm test
 ```
 
-## Updating the data
+## Data generation
 
 `web/data/achievements.json` comes from the wiki and Steam and is part of the repo.
 Fetch it again (only needed when the game gets new achievements):
@@ -157,7 +200,7 @@ Repentance+ value). The generator reads saved source pages and keeps known confl
 `QUALITY_CONFLICTS`; unresolved items use the documented wiki value. Trinkets, cards,
 runes, pills and pickups have no collectible Quality and are listed in `NO_QUALITY_SOURCE`.
 
-## Layout
+## Project layout
 
 | Path | What |
 |---|---|
@@ -175,12 +218,14 @@ runes, pills and pickups have no collectible Quality and are listed in `NO_QUALI
 | `web/data/challenge-tips.js` | Tip per challenge #1-#45, with wiki source |
 | `web/js/unlock-info.js` | Q badge and challenge tip for the unlock drawer |
 | `tools/sync-save.ps1` | Windows: send your save to your account without a browser, also automatically after playing |
+| `docs/screenshots/` | Screenshots used in this README |
 
 Deployment: see [DEPLOY.md](DEPLOY.md).
 
 ## Configuration
 
-All settings are environment variables; see [.env.example](.env.example).
+All settings are environment variables; see [.env.example](.env.example). The public
+origin of your instance is never hardcoded: set it with `PUBLIC_URL` in `.env`.
 
 | Variable | Meaning |
 |---|---|
@@ -211,6 +256,22 @@ they are still set.
 | Concurrency | Read-modify-write per account goes through a lock; files are written atomically (`0600`, directory `0700`). One server process per data directory: accounts and sessions are kept in memory. |
 | Not included | Deleting accounts, changing/forgetting passwords, 2FA, email verification. Forgotten password = the server operator edits `data/users.json`. |
 
+## Limitations
+
+- **Automatic sync is Windows-only.** `tools/sync-save.ps1` targets Windows PowerShell
+  5.1. On other platforms, upload your save file on the site or fill gaps from Steam
+  achievements.
+- **Steam sync needs public game details.** With or without `STEAM_API_KEY`, it only works
+  if "Game details" is set to Public in the player's Steam privacy settings.
+- **No account self-service.** There is no account deletion, no password change or reset,
+  no 2FA, and no email verification. The server sends no mail.
+- **Single process.** Run one server process per data directory, because accounts and
+  sessions are kept in memory. Rate-limit counters reset on restart.
+- **Game data is a snapshot.** If the game gets new achievements, regenerate
+  `web/data/achievements.json` with `npm run build-data`.
+- **Item Quality covers collectibles only.** Trinkets, cards, runes, pills and pickups
+  have no Q tier.
+
 ## License
 
 Original BasementDiary application code is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE).
@@ -219,6 +280,9 @@ requires separate permission. The license does not cover third-party software, d
 fonts, game assets, or trademarks; those remain under their own terms and attributions below.
 
 ## Sources
+
+Third-party sources and attributions. These materials are not covered by this project's
+license and stay under their own terms.
 
 - Unlock requirements: [Binding of Isaac: Rebirth Wiki](https://bindingofisaacrebirth.wiki.gg/wiki/Achievements) (CC BY-SA 3.0), via the Cargo export.
 - Save format: [REPENTOGON EventCounter](https://repentogon.com/enums/EventCounter.html), cross-checked with the offsets from [isaac-save-edit-script](https://github.com/jamesthejellyfish/isaac-save-edit-script) (MIT).
