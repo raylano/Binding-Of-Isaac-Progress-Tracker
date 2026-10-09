@@ -91,10 +91,10 @@ The following representative signed-in screens use synthetic demo progress; no p
 
 ## Playing Isaac with automatic sync (Windows)
 
-The script needs to know which server to sync to; there is no built-in default. The
-server's origin is configured with `PUBLIC_URL` in its `.env`, and the *Sync* page on the
-site shows the exact command with the right `-Server` for that server. Below,
-`https://your-domain.example` stands for that address.
+The script needs to know which server to sync to; there is no built-in default. On the
+first run it asks for the address (or takes it from `-Server`) and remembers it, so later
+runs need no arguments. The *Sync* page on the site shows the address and the exact
+command. Below, `https://your-domain.example` stands for that address.
 
 Install The Binding of Isaac: Rebirth and Repentance+ through Steam, and sign in to the
 Steam client on Windows before using the shortcut.
@@ -107,6 +107,7 @@ Steam client on Windows before using the shortcut.
    powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1 -Server https://your-domain.example -InstallShortcut
    ```
 
+   Without `-Server`, the script first asks for the server address.
 3. Log in with your email address and password. Creating a new account here (or on the
    site) only works while the admin has registration open.
 4. The script puts an **Isaac + sync** shortcut on your desktop. From now on, always start
@@ -115,8 +116,10 @@ Steam client on Windows before using the shortcut.
 
 The script never stores your password. The server issues a sync token for this PC, kept encrypted
 with Windows DPAPI (readable only by your Windows account); you can revoke it on the site
-under *Sync → Account*. Run the script with `-ResetLogin` to log in again or switch
-accounts. More options: [DEPLOY.md](DEPLOY.md#8-windows-sync-your-save-automatically).
+under *Sync → Account*; the script then asks you to log in again. The server address and
+your email address are saved in `%APPDATA%\boipt\config.json`. Run the script with
+`-ResetLogin` to forget the saved server and login and enter them again (to switch
+accounts or servers). More options: [DEPLOY.md](DEPLOY.md#8-windows-sync-your-save-automatically).
 
 ## Self-hosting on Linux (quickstart)
 

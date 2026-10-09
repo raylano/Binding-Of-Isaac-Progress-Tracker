@@ -186,11 +186,14 @@ Windows PowerShell 5.1 (built into Windows 10/11); its prompts are in English.
    powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1 -Server https://your-domain.example -InstallShortcut
    ```
 
+   You can also leave out `-Server`: on the first run the script then asks for the
+   server address.
 3. The script asks whether you already have an account (`y` = yes, `n` = no), then your
    email address and password. Creating an account from the script only works while
    registration is open. Your password is not stored: the server issues a sync token for
    this PC, saved encrypted with Windows DPAPI in
-   `%APPDATA%\boipt\account-<server>.xml`.
+   `%APPDATA%\boipt\account-<server>.xml`. The server address and email address (no
+   secrets) are saved in `%APPDATA%\boipt\config.json`, so later runs need no `-Server`.
 4. From now on start Isaac with the **Isaac + sync** desktop shortcut. It launches the
    game through Steam, waits until you close it, and then uploads the newest
    `rep+persistentgamedata<slot>.dat` (Steam userdata, or *Documents\My Games* without
@@ -199,22 +202,28 @@ Windows PowerShell 5.1 (built into Windows 10/11); its prompts are in English.
 Manual sync and options:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1 -Server https://your-domain.example
+powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1
 ```
 
 | Option | Effect |
 |---|---|
+| `-Server <url>` | Sync to this server instead of the saved one (and remember it after a successful login or sync). |
 | `-Slot 2` | Save slot 1, 2 or 3 (default 1). |
 | `-SavePath <file>` | Use this save file instead of searching. |
 | `-AfterGame` | Start Isaac, wait for it to close, then sync (what the shortcut does). |
-| `-ResetLogin` | Log in again, or switch account. |
+| `-InstallShortcut` | Log in if needed and create the **Isaac + sync** desktop shortcut. |
+| `-ResetLogin` | Forget the saved server and login (`config.json` and the token file), then ask for both again: to log in again, or switch account or server. |
 
-`-Server` overrides `BOIPT_SERVER`; without `-Server`, the script uses `BOIPT_SERVER`. There is
-no built-in default: if neither is set, the script stops with an error. Pass your server's
-public URL (its `PUBLIC_URL` from `.env`) with `-Server`, or set `BOIPT_SERVER` on the PC; the
-Sync page on the site shows the exact command. The desktop shortcut stores the `-Server` it was
-created with. Use only `https://` (or
-`http://localhost`). Lost a PC? Revoke its sync token on the site under *Sync → Account*.
+The server is taken from, in order: `-Server`, the `BOIPT_SERVER` environment variable, the
+saved `%APPDATA%\boipt\config.json`, and otherwise the script asks for it (the Sync page on the
+site shows the address, the server's `PUBLIC_URL`). The server you last logged in or synced to is
+saved; a server from `BOIPT_SERVER` is used but not saved. `BOIPT_TOKEN` replaces the saved sync
+token. There is no built-in default server, and in a non-interactive session without any of
+these the script stops with an error. The desktop shortcut stores the server it was created
+with; run `-InstallShortcut` again after switching servers. Use only `https://` (or
+`http://localhost`). If the sync token is revoked, the script asks you to log in again and
+updates the saved files. Lost a PC? Revoke its sync token on the site under *Sync → Account*.
+To remove everything from a PC, delete the `%APPDATA%\boipt` folder.
 
 ---
 
