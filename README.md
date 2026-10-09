@@ -43,6 +43,33 @@ on Windows your save can sync by itself each time you quit the game.
 </p>
 <p align="center"><em>The public login screen. Everything else is behind an account.</em></p>
 
+The following representative signed-in screens use synthetic demo progress; no private user data is included.
+
+<p align="center">
+  <img src="docs/screenshots/basement.png" alt="BasementDiary Basement dashboard with progress counters and next unlock recommendations" width="720">
+</p>
+<p align="center"><em>Basement dashboard with progress at a glance.</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/characters.png" alt="BasementDiary Characters page showing character completion progress and completion marks" width="720">
+</p>
+<p align="center"><em>Character completion marks and progress.</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/map.png" alt="BasementDiary Map page showing the Isaac progression map" width="720">
+</p>
+<p align="center"><em>Progression map for the major game paths.</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/secrets.png" alt="BasementDiary Secrets page showing searchable unlocks and unlocked secret entries" width="720">
+</p>
+<p align="center"><em>Searchable secret and achievement unlocks.</em></p>
+
+<p align="center">
+  <img src="docs/screenshots/route.png" alt="BasementDiary Route page showing recommended unlock order and route progress" width="720">
+</p>
+<p align="center"><em>Recommended route order and current progress.</em></p>
+
 ## Features
 
 - **All your unlocks**: 641 achievements, 34 characters, 408 completion marks (normal and hard).
