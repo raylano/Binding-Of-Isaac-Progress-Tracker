@@ -124,7 +124,7 @@ You need a Linux server with Docker and Docker Compose, a domain whose DNS point
 server, and an HTTPS reverse proxy (e.g. nginx with Let's Encrypt) in front of the app.
 
 ```bash
-git clone https://github.com/raylano/BOIPT.git ~/BOIPT && cd ~/BOIPT
+git clone https://github.com/raylano/Binding-Of-Isaac-Progress-Tracker.git ~/BOIPT && cd ~/BOIPT
 cp .env.example .env
 chmod 600 .env
 ```
