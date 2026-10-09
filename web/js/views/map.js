@@ -1,6 +1,6 @@
-// Voortgangskaart in minimap-stijl: elke kamer is een gebied of eindbaas, de
-// gangen zijn de afhankelijkheden. Wit = gehaald, gestippeld = bereikbaar,
-// donker = nog op slot.
+// Progress map in minimap style: every room is an area or final boss, the
+// corridors are the dependencies. White = done, dotted = reachable,
+// dark = still locked.
 
 import { store } from '../store.js';
 import { CHARACTERS, MARK_INDEX, MARK_REQUIRES } from '../../data/characters.js';
@@ -12,32 +12,32 @@ const W = 150;
 const H = 86;
 const WIKI = 'https://bindingofisaacrebirth.wiki.gg/wiki/';
 
-// x/y in rasterposities. gate = achievement dat het gebied opent, boss = mark-sleutel.
+// x/y in grid positions. gate = achievement that opens the area, boss = mark key.
 const NODES = [
-  { key: 'basement', label: 'Basement', x: 0, y: 1, always: true, text: 'Het begin. Basement en Caves zijn altijd open.', wiki: 'Basement' },
-  { key: 'caves', label: 'Caves', x: 1, y: 1, always: true, text: 'Hoofdpad, verdieping 3-4.', wiki: 'Caves' },
-  { key: 'depths', label: 'Depths · Mom', x: 2, y: 1, always: true, text: 'Mom verslaan opent The Womb (#4). Binnen 20 min op Depths II opent de deur naar Boss Rush.', wiki: 'Mom' },
-  { key: 'bossrush', label: 'Boss Rush', x: 2, y: 0, boss: 'bossrush', text: 'Mom verslaan binnen 20 minuten (Depths II) of 25 minuten (Mausoleum/Gehenna II).', wiki: 'Boss_Rush' },
-  { key: 'womb', label: "Womb · Heart", x: 3, y: 1, gate: 4, boss: 'heart', text: "Mom's Heart (of It Lives! na 11 keer, #34). 10 keer = Blue Womb, 11 keer = It Lives!.", wiki: 'Womb' },
-  { key: 'bluewomb', label: 'Blue Womb · Hush', x: 3, y: 0, gate: 234, boss: 'hush', counter: ['hushKills', 3, 'Hush-kills voor A Secret Exit'], text: "Na 10x Mom's Heart (#234). Mom's Heart binnen 30 min verslaan opent de deur. Hush 1x = The Void, 3x = A Secret Exit.", wiki: 'Blue_Womb' },
-  { key: 'void', label: 'Void · Delirium', x: 4, y: 0, gate: 320, boss: 'delirium', text: 'Hush verslaan opent The Void (#320). In Repentance+ is het portaal gegarandeerd na Hush, ???, The Lamb en Mega Satan.', wiki: 'The_Void' },
-  { key: 'cathedral', label: 'Cathedral', x: 4, y: 1, needs: [4], boss: 'isaac', text: "Na Mom's Heart: lichtstraal naar Cathedral. Isaac 5x verslaan = The Polaroid (#57).", wiki: 'Cathedral' },
-  { key: 'chest', label: 'The Chest · ???', x: 5, y: 1, gate: 57, boss: 'bluebaby', text: "Raak Isaac's kist aan met The Polaroid in je bezit.", wiki: 'The_Chest' },
-  { key: 'sheol', label: 'Sheol', x: 4, y: 2, needs: [4], boss: 'satan', text: "Na Mom's Heart: luik naar Sheol. Satan 5x verslaan = The Negative (#78).", wiki: 'Sheol' },
-  { key: 'darkroom', label: 'Dark Room · Lamb', x: 5, y: 2, gate: 78, boss: 'lamb', text: "Raak Satan's kist aan met The Negative in je bezit.", wiki: 'Dark_Room' },
-  { key: 'megasatan', label: 'Mega Satan', x: 6, y: 1, gate: 155, boss: 'megasatan', text: 'Gouden deur in de startkamer van The Chest of Dark Room. Open met beide sleutelstukken uit Angel Rooms (Angels, #155) of Dad\'s Key.', wiki: 'Mega_Satan' },
-  { key: 'secretexit', label: 'Geheime uitgang', x: 0, y: 3, gate: 407, counter: ['hushKills', 3, 'Hush-kills'], text: 'A Secret Exit (#407): Hush 3x verslaan. Daarna zit er op elke verdieping II een extra uitgang naar het alternatieve pad.', wiki: 'Downpour' },
-  { key: 'downpour', label: 'Downpour', x: 1, y: 3, gate: 407, doneAch: 412, text: 'Deur met een sleutel. Op II: raak de witte vlam aan en ga door de spiegel voor mesdeel 1. Alle bazen hier = Dross (#412).', wiki: 'Downpour' },
-  { key: 'mines', label: 'Mines', x: 2, y: 3, gate: 407, doneAch: 413, text: 'Deur kost 2 bommen. Op II: druk 3 gele knoppen in en neem de mijnkar voor mesdeel 2. Alle bazen hier = Ashpit (#413).', wiki: 'Mines' },
-  { key: 'mausoleum', label: 'Mausoleum', x: 3, y: 3, gate: 407, doneAch: 414, text: 'Deur kost 2 hartjes. Op II: Mom, dan de vleesdeur openen met het mes. Alle bazen hier = Gehenna (#414).', wiki: 'Mausoleum' },
-  { key: 'corpse', label: 'Corpse', x: 4, y: 3, gate: 407, doneAch: 411, text: 'Bereikbaar met beide mesdelen via Mausoleum/Gehenna II. Eerste keer binnen = Rotten Heart (#411).', wiki: 'Corpse' },
-  { key: 'mother', label: 'Mother', x: 5, y: 3, gate: 407, boss: 'mother', text: 'Mother verslaan: A Strange Door (#635) en Jacob & Esau (#405). De belangrijkste unlock van Repentance.', wiki: 'Mother' },
-  { key: 'home', label: "Home · Dad's Note", x: 6, y: 3, gate: 635, doneAch: 415, text: "Strange Door in de startkamer van Depths II, opent met The Polaroid of Negative (die wordt opgebruikt). De speciale Mausoleum II heeft geen Mom: de bossroom bevat Dad's Note → Ascent → Home. Mom's Chest = Red Key (#415).", wiki: 'Home' },
-  { key: 'beast', label: 'The Beast', x: 7, y: 3, gate: 635, boss: 'beast', text: 'Na Home: Dogma en daarna The Beast.', wiki: 'The_Beast' },
-  { key: 'closet', label: 'Tainted-kast', x: 6, y: 4, gate: 635, tainted: true, text: 'In de gang van Home: open de kast met de Red Key (eerste bezoek gegarandeerd), een Cracked Key of Soul of Cain. Je krijgt de tainted versie van je huidige personage. Eén per run.', wiki: 'Tainted_Characters' },
-  { key: 'greed', label: 'Greed mode', x: 0, y: 5, always: true, boss: 'greed', text: 'Altijd open. Na Ultra Greed kun je munten doneren aan de Greed-machine; die tellen over runs heen.', wiki: 'Greed_Mode' },
-  { key: 'greedier', label: 'Greedier', x: 1, y: 5, gate: 341, counter: ['greedDonation', 500, 'munten in de Greed-machine'], text: '500 munten gedoneerd (#341). Greedier telt als de harde Greed-mark.', wiki: 'Greedier_Mode' },
-  { key: 'keeper', label: 'Keeper', x: 2, y: 5, gate: 251, counter: ['greedDonation', 1000, 'munten in de Greed-machine'], text: '1000 munten gedoneerd (#251). Onderweg: 879 = Holy Mantle voor The Lost (#250).', wiki: 'Keeper' },
+  { key: 'basement', label: 'Basement', x: 0, y: 1, always: true, text: 'The start. Basement and Caves are always open.', wiki: 'Basement' },
+  { key: 'caves', label: 'Caves', x: 1, y: 1, always: true, text: 'Main path, floors 3-4.', wiki: 'Caves' },
+  { key: 'depths', label: 'Depths · Mom', x: 2, y: 1, always: true, text: 'Beating Mom opens The Womb (#4). Within 20 min on Depths II opens the door to Boss Rush.', wiki: 'Mom' },
+  { key: 'bossrush', label: 'Boss Rush', x: 2, y: 0, boss: 'bossrush', text: 'Beat Mom within 20 minutes (Depths II) or 25 minutes (Mausoleum/Gehenna II).', wiki: 'Boss_Rush' },
+  { key: 'womb', label: "Womb · Heart", x: 3, y: 1, gate: 4, boss: 'heart', text: "Mom's Heart (or It Lives! after 11 times, #34). 10 times = Blue Womb, 11 times = It Lives!.", wiki: 'Womb' },
+  { key: 'bluewomb', label: 'Blue Womb · Hush', x: 3, y: 0, gate: 234, boss: 'hush', counter: ['hushKills', 3, 'Hush kills for A Secret Exit'], text: "After 10x Mom's Heart (#234). Beating Mom's Heart within 30 min opens the door. Hush 1x = The Void, 3x = A Secret Exit.", wiki: 'Blue_Womb' },
+  { key: 'void', label: 'Void · Delirium', x: 4, y: 0, gate: 320, boss: 'delirium', text: 'Beating Hush opens The Void (#320). In Repentance+ the portal is guaranteed after Hush, ???, The Lamb and Mega Satan.', wiki: 'The_Void' },
+  { key: 'cathedral', label: 'Cathedral', x: 4, y: 1, needs: [4], boss: 'isaac', text: "After Mom's Heart: beam of light to Cathedral. Beat Isaac 5x = The Polaroid (#57).", wiki: 'Cathedral' },
+  { key: 'chest', label: 'The Chest · ???', x: 5, y: 1, gate: 57, boss: 'bluebaby', text: "Touch Isaac's chest while holding The Polaroid.", wiki: 'The_Chest' },
+  { key: 'sheol', label: 'Sheol', x: 4, y: 2, needs: [4], boss: 'satan', text: "After Mom's Heart: trapdoor to Sheol. Beat Satan 5x = The Negative (#78).", wiki: 'Sheol' },
+  { key: 'darkroom', label: 'Dark Room · Lamb', x: 5, y: 2, gate: 78, boss: 'lamb', text: "Touch Satan's chest while holding The Negative.", wiki: 'Dark_Room' },
+  { key: 'megasatan', label: 'Mega Satan', x: 6, y: 1, gate: 155, boss: 'megasatan', text: 'Golden door in the starting room of The Chest or Dark Room. Open it with both key pieces from Angel Rooms (Angels, #155) or Dad\'s Key.', wiki: 'Mega_Satan' },
+  { key: 'secretexit', label: 'Secret exit', x: 0, y: 3, gate: 407, counter: ['hushKills', 3, 'Hush kills'], text: 'A Secret Exit (#407): beat Hush 3x. After that every floor II has an extra exit to the alternate path.', wiki: 'Downpour' },
+  { key: 'downpour', label: 'Downpour', x: 1, y: 3, gate: 407, doneAch: 412, text: 'Door with a key. On II: touch the white fire and go through the mirror for knife piece 1. All bosses here = Dross (#412).', wiki: 'Downpour' },
+  { key: 'mines', label: 'Mines', x: 2, y: 3, gate: 407, doneAch: 413, text: 'Door costs 2 bombs. On II: press 3 yellow buttons and take the mine cart for knife piece 2. All bosses here = Ashpit (#413).', wiki: 'Mines' },
+  { key: 'mausoleum', label: 'Mausoleum', x: 3, y: 3, gate: 407, doneAch: 414, text: 'Door costs 2 hearts. On II: Mom, then open the flesh door with the knife. All bosses here = Gehenna (#414).', wiki: 'Mausoleum' },
+  { key: 'corpse', label: 'Corpse', x: 4, y: 3, gate: 407, doneAch: 411, text: 'Reachable with both knife pieces via Mausoleum/Gehenna II. First visit = Rotten Heart (#411).', wiki: 'Corpse' },
+  { key: 'mother', label: 'Mother', x: 5, y: 3, gate: 407, boss: 'mother', text: 'Beating Mother: A Strange Door (#635) and Jacob & Esau (#405). The most important unlock in Repentance.', wiki: 'Mother' },
+  { key: 'home', label: "Home · Dad's Note", x: 6, y: 3, gate: 635, doneAch: 415, text: "Strange Door in the starting room of Depths II, opened with The Polaroid or Negative (which is used up). The special Mausoleum II has no Mom: the boss room holds Dad's Note → Ascent → Home. Mom's Chest = Red Key (#415).", wiki: 'Home' },
+  { key: 'beast', label: 'The Beast', x: 7, y: 3, gate: 635, boss: 'beast', text: 'After Home: Dogma and then The Beast.', wiki: 'The_Beast' },
+  { key: 'closet', label: 'Tainted closet', x: 6, y: 4, gate: 635, tainted: true, text: 'In the hallway of Home: open the closet with the Red Key (guaranteed on the first visit), a Cracked Key or Soul of Cain. You get the tainted version of your current character. One per run.', wiki: 'Tainted_Characters' },
+  { key: 'greed', label: 'Greed mode', x: 0, y: 5, always: true, boss: 'greed', text: 'Always open. After Ultra Greed you can donate coins to the Greed machine; they count across runs.', wiki: 'Greed_Mode' },
+  { key: 'greedier', label: 'Greedier', x: 1, y: 5, gate: 341, counter: ['greedDonation', 500, 'coins in the Greed machine'], text: '500 coins donated (#341). Greedier counts as the hard Greed mark.', wiki: 'Greedier_Mode' },
+  { key: 'keeper', label: 'Keeper', x: 2, y: 5, gate: 251, counter: ['greedDonation', 1000, 'coins in the Greed machine'], text: '1000 coins donated (#251). Along the way: 879 = Holy Mantle for The Lost (#250).', wiki: 'Keeper' },
 ];
 
 const EDGES = [
@@ -120,19 +120,19 @@ export function update(root) {
 
   const n = byKey[selected];
   root.innerHTML = `
-    <h1 class="view-title">Kaart</h1>
-    <p class="view-sub">Elke kamer is een gebied of eindbaas; de gangen tonen wat wat opent. Tik een kamer voor de voorwaarden.</p>
+    <h1 class="view-title">Map</h1>
+    <p class="view-sub">Every room is an area or final boss; the corridors show what opens what. Tap a room for its requirements.</p>
     <div class="map-wrap">
       <div>
         <div class="map-scroll">
-          <svg class="map" viewBox="-6 -6 ${cols * W + 12} ${rows * H + 12}" role="img" aria-label="Voortgangskaart">
+          <svg class="map" viewBox="-6 -6 ${cols * W + 12} ${rows * H + 12}" role="img" aria-label="Progress map">
             ${edges}${rooms}
           </svg>
         </div>
         <div class="map-legend">
-          <span><i style="background:#e8dcc0;border-color:#000"></i>gehaald</span>
-          <span><i style="background:#4b3a2c;border-color:#e8dcc0;border-style:dashed"></i>bereikbaar</span>
-          <span><i style="background:#1c140f;border-color:#3d2f24"></i>op slot</span>
+          <span><i style="background:#e8dcc0;border-color:#000"></i>done</span>
+          <span><i style="background:#4b3a2c;border-color:#e8dcc0;border-style:dashed"></i>reachable</span>
+          <span><i style="background:#1c140f;border-color:#3d2f24"></i>locked</span>
         </div>
       </div>
       <aside class="paper tape">${detail(model, state, n, st[n.key])}</aside>
@@ -147,17 +147,17 @@ function detail(model, state, n, status) {
     const gateId = n.gate || (n.boss && MARK_REQUIRES[n.boss].find((r) => !Array.isArray(r) && !state.achievements.has(r)));
     if (gateId && !state.achievements.has(gateId)) {
       const a = model.byId.get(gateId);
-      chain = `<h4>Eerst nodig</h4><ul class="chain-list"><li><b>${esc(a.name)}</b> — ${esc(a.how)}${chainHtml(model, blockerChain(model, state, gateId))}</li></ul>`;
+      chain = `<h4>Needed first</h4><ul class="chain-list"><li><b>${esc(a.name)}</b> — ${esc(a.how)}${chainHtml(model, blockerChain(model, state, gateId))}</li></ul>`;
     }
   }
   return `
-    <div class="ink-label">${n.boss ? `${glyph(n.boss)}` : ''} kamer</div>
+    <div class="ink-label">${n.boss ? `${glyph(n.boss)}` : ''} room</div>
     <h3>${esc(n.label)}</h3>
     <p>${statusBadge(status)}</p>
     <p>${esc(n.text)}</p>
-    ${n.counter ? `<h4>Teller</h4>${counter === undefined ? '<p class="muted">Onbekend: importeer je save.</p>' : `${bar(Math.min(counter, n.counter[1]), n.counter[1], 'gold')}<p class="muted">${counter} / ${n.counter[1]} ${esc(n.counter[2])}</p>`}` : ''}
+    ${n.counter ? `<h4>Counter</h4>${counter === undefined ? '<p class="muted">Unknown: import your save.</p>' : `${bar(Math.min(counter, n.counter[1]), n.counter[1], 'gold')}<p class="muted">${counter} / ${n.counter[1]} ${esc(n.counter[2])}</p>`}` : ''}
     ${chain}
-    ${n.boss ? `<h4>Verslagen door</h4><p>${by.length ? by.map((c) => `${esc(c.short || c.name)}${state.marks[c.key][MARK_INDEX[n.boss]] === 2 ? ' <b style="color:var(--blood)">(hard)</b>' : ''}`).join(', ') : '<span class="muted">nog niemand</span>'}</p>` : ''}
-    ${n.tainted ? `<h4>Tainted ontgrendeld</h4><p>${CHARACTERS.filter((c) => c.tainted && charUnlocked(state, c.key)).map((c) => esc(c.name)).join(', ') || '<span class="muted">nog geen</span>'}</p>` : ''}
+    ${n.boss ? `<h4>Beaten by</h4><p>${by.length ? by.map((c) => `${esc(c.short || c.name)}${state.marks[c.key][MARK_INDEX[n.boss]] === 2 ? ' <b style="color:var(--blood)">(hard)</b>' : ''}`).join(', ') : '<span class="muted">nobody yet</span>'}</p>` : ''}
+    ${n.tainted ? `<h4>Tainted unlocked</h4><p>${CHARACTERS.filter((c) => c.tainted && charUnlocked(state, c.key)).map((c) => esc(c.name)).join(', ') || '<span class="muted">none yet</span>'}</p>` : ''}
     <p class="src"><a href="${WIKI}${esc(n.wiki)}" target="_blank" rel="noopener">wiki: ${esc(n.wiki.replace(/_/g, ' '))}</a></p>`;
 }

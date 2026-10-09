@@ -1,25 +1,25 @@
-// Leest een Repentance(+)-save (rep+persistentgamedata1.dat / rep_persistentgamedata1.dat).
-// Puur en zonder afhankelijkheden: draait in de browser en in Node.
+// Reads a Repentance(+) save (rep+persistentgamedata1.dat / rep_persistentgamedata1.dat).
+// Pure and dependency-free: runs in the browser and in Node.
 //
-// Formaat (little-endian, niet versleuteld):
+// Format (little-endian, not encrypted):
 //   0x00  "ISAACNGSAVE09R  " (16 bytes)
-//   0x14  secties, elk: type (u32), lengte (u32), aantal (u32), daarna aantal x entrygrootte
-//   sectie 1: achievements, 1 byte per ID (index 0 ongebruikt)
-//   sectie 2: event counters, 4 bytes per stuk -- hier staan ook de completion marks
-//   laatste 4 bytes: checksum (hier niet nodig, we schrijven nooit)
+//   0x14  sections, each: type (u32), length (u32), count (u32), then count x entry size
+//   section 1: achievements, 1 byte per ID (index 0 unused)
+//   section 2: event counters, 4 bytes each -- the completion marks live here too
+//   last 4 bytes: checksum (not needed here, we never write)
 //
-// Counter-indexen komen uit REPENTOGON's EventCounter-lijst; de mark-offsets zijn
-// daarnaast nagerekend met de offsets uit jamesthejellyfish/isaac-save-edit-script (MIT).
-// Beide bronnen geven voor alle 34 x 12 marks hetzelfde resultaat.
+// Counter indexes come from REPENTOGON's EventCounter list; the mark offsets were
+// also cross-checked against the offsets from jamesthejellyfish/isaac-save-edit-script (MIT).
+// Both sources give the same result for all 34 x 12 marks.
 
 const HEADER = 'ISAACNGSAVE09R';
 const ENTRY_SIZES = [1, 4, 4, 1, 1, 1, 1, 4, 4, 1];
 
 export const VERSIONS = { 0x7e: 'Repentance', 0x82: 'Repentance+' };
 
-// Counter-index per mark (save-volgorde van MARKS) per personage (save-volgorde).
-// Voor de eerste 14 personages loopt het netjes op; The Forgotten en alles daarna
-// is later toegevoegd en zit verspreid.
+// Counter index per mark (save order of MARKS) per character (save order).
+// For the first 14 characters it increases neatly; The Forgotten and everything
+// after was added later and is scattered.
 function row(first14, forgotten, rest) {
   const out = [];
   for (let i = 0; i < 14; i++) out.push(first14 + i);
@@ -88,8 +88,8 @@ export const COUNTERS = {
 
 export class SaveError extends Error {}
 
-// Een mark-byte: bits 0-1 offline, bits 2-3 online (Repentance+). Binnen een paar
-// betekent 1 normal, 2 hard en 3 beide; hard telt altijd ook als normal.
+// A mark byte: bits 0-1 offline, bits 2-3 online (Repentance+). Within a pair,
+// 1 means normal, 2 hard and 3 both; hard always counts as normal too.
 export function decodeMark(v) {
   const level = (bits) => (bits & 2 ? 2 : bits & 1 ? 1 : 0);
   return { solo: level(v & 3), online: level((v >> 2) & 3) };
@@ -97,9 +97,9 @@ export function decodeMark(v) {
 
 export function parseSave(input) {
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
-  if (bytes.length < 0x40) throw new SaveError('Dit bestand is te klein voor een Isaac-save.');
+  if (bytes.length < 0x40) throw new SaveError('This file is too small to be an Isaac save.');
   const head = String.fromCharCode(...bytes.subarray(0, HEADER.length));
-  if (head !== HEADER) throw new SaveError('Dit is geen Isaac-save (verkeerde header).');
+  if (head !== HEADER) throw new SaveError('This is not an Isaac save (wrong header).');
 
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const version = bytes[0x18];
@@ -107,12 +107,12 @@ export function parseSave(input) {
   const sections = [];
   let ofs = 0x14;
   for (const size of ENTRY_SIZES) {
-    if (ofs + 12 > bytes.length) throw new SaveError('Save is afgekapt of onbekend formaat.');
+    if (ofs + 12 > bytes.length) throw new SaveError('Save is truncated or in an unknown format.');
     const count = dv.getUint32(ofs + 8, true);
     ofs += 12;
     sections.push({ start: ofs, count });
     ofs += count * size;
-    if (ofs > bytes.length) throw new SaveError('Save is afgekapt of onbekend formaat.');
+    if (ofs > bytes.length) throw new SaveError('Save is truncated or in an unknown format.');
   }
 
   const [ach, ctr] = sections;
@@ -140,7 +140,7 @@ export function parseSave(input) {
 
   return {
     version,
-    edition: VERSIONS[version] || `onbekend (0x${version.toString(16)})`,
+    edition: VERSIONS[version] || `unknown (0x${version.toString(16)})`,
     achievementSlots: ach.count - 1,
     achievements,
     marks,

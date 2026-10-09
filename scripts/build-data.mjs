@@ -1,15 +1,15 @@
-// Bouwt web/data/achievements.json opnieuw op uit twee openbare bronnen:
-//   1. de Cargo-tabel "achievement" van de officiele wiki (namen, eisen, DLC)
-//   2. Steam, alleen voor de iconen: met STEAM_API_KEY via GetSchemaForGame, anders
-//      via de publieke achievementpagina van STEAM_ID (een profiel dat Isaac heeft)
+// Rebuilds web/data/achievements.json from two public sources:
+//   1. the Cargo table "achievement" of the official wiki (names, requirements, DLC)
+//   2. Steam, only for the icons: with STEAM_API_KEY via GetSchemaForGame, otherwise
+//      via the public achievements page of STEAM_ID (a profile that owns Isaac)
 //
-// Draai dit alleen als de wiki of het spel verandert; het resultaat staat in de repo
-// zodat de site zelf nooit van de wiki afhankelijk is. Zonder Steam-gegevens blijven
-// de iconen uit de huidige versie staan.
+// Only run this when the wiki or the game changes; the result is kept in the repo
+// so the site itself never depends on the wiki. Without Steam data, the icons from
+// the current version are kept.
 //
 //   node scripts/build-data.mjs
 //
-// Wiki-inhoud valt onder CC BY-SA 3.0 (bindingofisaacrebirth.wiki.gg).
+// Wiki content is licensed under CC BY-SA 3.0 (bindingofisaacrebirth.wiki.gg).
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -19,20 +19,20 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'web', 'data', 'achievements.json');
 const UA = 'BOIPT-tracker/1.0 (persoonlijke voortgangstracker)';
 
-// STEAM_ID / STEAM_API_KEY uit .env, als die er is.
+// STEAM_ID / STEAM_API_KEY from .env, if it exists.
 try {
   for (const line of (await fs.readFile(path.join(ROOT, '.env'), 'utf8')).split(/\r?\n/)) {
     const m = line.match(/^\s*(STEAM_ID|STEAM_API_KEY)\s*=\s*(\S*)\s*$/);
     if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
   }
-} catch { /* geen .env */ }
+} catch { /* no .env */ }
 
 const CARGO_URL =
   'https://bindingofisaacrebirth.wiki.gg/index.php?title=Special:CargoExport' +
   '&tables=achievement&fields=id,name,dlc,description,requirements,notes,link' +
   '&order+by=id&limit=1000&format=json';
 
-// Repentance+ is bit 16 in de DLC-bitmask van de wiki (1 Rebirth, 2 Afterbirth,
+// Repentance+ is bit 16 in the wiki's DLC bitmask (1 Rebirth, 2 Afterbirth,
 // 4 Afterbirth+, 8 Repentance, 16 Repentance+).
 const REP_PLUS = 16;
 
@@ -45,9 +45,9 @@ function decodeEntities(s) {
     .replace(/&amp;/g, '&');
 }
 
-// Wikitekst -> platte tekst die voor Repentance+ geldt. Een DLC-icoon met cf-val-N
-// zegt voor welke versies de tekst erna geldt; staat Repentance+ daar niet in, dan
-// valt dat stuk weg tot het volgende icoon of de volgende regel.
+// Wikitext -> plain text that applies to Repentance+. A DLC icon with cf-val-N
+// says which versions the text after it applies to; if Repentance+ is not among
+// them, that part is dropped up to the next icon or the next line.
 export function cleanWikitext(raw) {
   if (!raw) return '';
   const s = decodeEntities(raw);
@@ -106,11 +106,11 @@ async function steamIcons() {
     console.warn('Steam-iconen niet opgehaald:', err.message);
   }
   if (!icons.size) {
-    // Terugvallen op de iconen die er al staan.
+    // Fall back to the icons that are already there.
     try {
       for (const a of JSON.parse(await fs.readFile(OUT, 'utf8'))) if (a.icon) icons.set(a.id, a.icon);
       console.warn('Geen STEAM_API_KEY of STEAM_ID: bestaande iconen behouden.');
-    } catch { /* eerste keer */ }
+    } catch { /* first run */ }
   }
   return icons;
 }
@@ -132,7 +132,7 @@ async function main() {
     }))
     .sort((a, b) => a.id - b.id);
 
-  // Sanity: 1..N zonder gaten, anders klopt de koppeling met save en Steam niet meer.
+  // Sanity: 1..N without gaps, otherwise the mapping to the save and Steam breaks.
   out.forEach((a, i) => {
     if (a.id !== i + 1) throw new Error(`Gat in de ID-reeks bij ${i + 1}`);
   });

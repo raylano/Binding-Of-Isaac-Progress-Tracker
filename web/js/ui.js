@@ -1,4 +1,4 @@
-// Kleine UI-hulpjes zonder framework.
+// Small UI helpers without a framework.
 
 import { CHAR_BY_KEY, MARKS } from '../data/characters.js';
 import { store } from './store.js';
@@ -7,7 +7,7 @@ export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&a
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 
-// ---------- Pixel-iconen (HUD) ----------
+// ---------- Pixel icons (HUD) ----------
 const PALETTE = { K: '#0b0705', R: '#d7322f', r: '#8c1215', W: '#ffe9e0', Y: '#e3b23c', D: '#9c7518', G: '#5b5f66', g: '#3a3d42', E: '#3a2a22', B: '#6d8fd0', b: '#3f5d97' };
 const PIXELS = {
   heart: ['.KK...KK.', 'KRWK.KRRK', 'KRRRKRRrK', 'KRRRRRRrK', '.KRRRRrK.', '..KRRrK..', '...KrK...', '....K....'],
@@ -32,14 +32,14 @@ export function pixel(name, title = '') {
   return `<svg viewBox="0 0 ${w} ${h}" shape-rendering="crispEdges" role="img" aria-label="${esc(title || name)}">${rects}</svg>`;
 }
 
-// ---------- Glyphs en iconen ----------
+// ---------- Glyphs and icons ----------
 export const glyph = (markKey, title = '') =>
   `<svg class="gl" viewBox="0 0 32 32" aria-hidden="${title ? 'false' : 'true'}"${title ? ` role="img" aria-label="${esc(title)}"` : ''}><use href="#g-${markKey}"/></svg>`;
 
 export const markName = (key) => MARKS.find((m) => m.key === key)?.name || key;
 
-// Portret: het Steam-icoon van het achievement dat het personage ontgrendelt.
-// Isaac heeft er geen; daar gebruiken we "Isaac's Head".
+// Portrait: the Steam icon of the achievement that unlocks the character.
+// Isaac has none; for him we use "Isaac's Head".
 export function portraitId(charKey) {
   const c = CHAR_BY_KEY[charKey];
   return c.unlock || 70;
@@ -65,7 +65,7 @@ export function achChip(model, id, extra = '') {
 }
 
 export function statusBadge(status) {
-  const label = { done: 'binnen', open: 'beschikbaar', locked: 'op slot' }[status] || status;
+  const label = { done: 'unlocked', open: 'available', locked: 'locked' }[status] || status;
   return `<span class="badge ${status}">${label}</span>`;
 }
 
@@ -76,9 +76,9 @@ export function bar(have, need, cls = '') {
 
 export function timeAgo(t) {
   const s = Math.round((Date.now() - t) / 1000);
-  if (s < 60) return 'net';
+  if (s < 60) return 'moments';
   if (s < 3600) return `${Math.round(s / 60)} min`;
-  if (s < 86400) return `${Math.round(s / 3600)} u`;
+  if (s < 86400) return `${Math.round(s / 3600)} h`;
   return `${Math.round(s / 86400)} d`;
 }
 
@@ -105,12 +105,12 @@ export function toast({ kicker = '', title = '', icon = '', action = null, ms = 
 export function unlockedToasts(model, ids) {
   ids.slice(0, 3).forEach((id, i) => {
     const a = model.byId.get(id);
-    if (a) setTimeout(() => toast({ kicker: 'GEHEIM ONTGRENDELD', title: a.name, icon: a.icon }), i * 260);
+    if (a) setTimeout(() => toast({ kicker: 'SECRET UNLOCKED', title: a.name, icon: a.icon }), i * 260);
   });
-  if (ids.length > 3) setTimeout(() => toast({ kicker: 'EN NOG', title: `${ids.length - 3} andere geheimen` }), 800);
+  if (ids.length > 3) setTimeout(() => toast({ kicker: 'AND MORE', title: `${ids.length - 3} other secrets` }), 800);
 }
 
-// ---------- Lade en modal ----------
+// ---------- Drawer and modal ----------
 let drawerClose = null;
 export function openDrawer(html, onClose) {
   closeDrawer(true);
@@ -120,7 +120,7 @@ export function openDrawer(html, onClose) {
   d.className = 'drawer';
   d.setAttribute('role', 'dialog');
   d.setAttribute('aria-modal', 'true');
-  d.innerHTML = `<button type="button" class="btn small close" data-close>Sluiten ✕</button>${html}`;
+  d.innerHTML = `<button type="button" class="btn small close" data-close>Close ✕</button>${html}`;
   document.body.append(bg, d);
   const prevFocus = document.activeElement;
   d.querySelector('[data-close]').focus();

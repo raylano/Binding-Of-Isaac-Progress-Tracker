@@ -1,4 +1,4 @@
-/* Kelderdagboek — Isaac-stijl: donkere kelder, papieren briefjes, inkt, pixel-HUD. */
+/* BasementDiary — Isaac style: dark basement, paper notes, ink, pixel HUD. */
 
 @font-face { font-family: 'Rock Salt'; src: url(../fonts/rock-salt.woff2) format('woff2'); font-display: swap; }
 @font-face { font-family: 'Gochi Hand'; src: url(../fonts/gochi-hand.woff2) format('woff2'); font-display: swap; }
@@ -46,14 +46,14 @@ body {
   font-size: 18px;
   line-height: 1.35;
   background-color: var(--cellar);
-  /* Keldervloer: grove stenen tegels + korrel. */
+  /* Basement floor: rough stone tiles + grain. */
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .1 0 0 0 0 .07 0 0 0 0 .05 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E"),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='120'%3E%3Cpath d='M0 60h160M80 0v60M0 0v120M160 0v120M40 60v60M120 60v60' stroke='%23000' stroke-opacity='.35' stroke-width='3' fill='none'/%3E%3C/svg%3E"),
     radial-gradient(ellipse at 50% 20%, #2e2017 0%, var(--cellar) 70%);
   background-attachment: fixed;
 }
-/* De duisternis aan de randen van het scherm, zoals in het spel. */
+/* The darkness at the edges of the screen, as in the game. */
 body::after {
   content: '';
   position: fixed;
@@ -70,7 +70,7 @@ button { font: inherit; color: inherit; }
 :focus-visible { outline: 2px dashed var(--gold); outline-offset: 3px; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-/* ---------- HUD-kop ---------- */
+/* ---------- HUD header ---------- */
 .hud {
   position: sticky;
   top: 0;
@@ -105,7 +105,7 @@ button { font: inherit; color: inherit; }
 .sync-pill.busy i { background: var(--gold); box-shadow: 0 0 6px var(--gold); }
 .sync-pill.err i { background: var(--blood-bright); box-shadow: 0 0 6px var(--blood-bright); }
 
-/* Tabs als scheurtjes papier. */
+/* Tabs as torn scraps of paper. */
 .tabs { max-width: 1240px; margin: 12px auto 0; display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 10px; scrollbar-width: none; }
 .tabs::-webkit-scrollbar { display: none; }
 .tab {
@@ -128,7 +128,7 @@ button { font: inherit; color: inherit; }
 .tab:hover { transform: rotate(0) translateY(0); color: var(--ink); }
 .tab[aria-current='page'] { background: var(--paper); transform: rotate(0) translateY(-2px); box-shadow: 0 6px 14px -4px #000, 0 0 0 2px var(--ink) inset; }
 
-/* ---------- Pagina ---------- */
+/* ---------- Page ---------- */
 main { max-width: 1240px; margin: 0 auto; padding: 8px var(--gutter) 64px; position: relative; z-index: 1; }
 .view-title { font-family: var(--font-scrawl); font-size: clamp(22px, 3.5vw, 34px); margin: 14px 0 4px; text-shadow: 2px 2px 0 #000; font-weight: 400; transform: rotate(-1deg); transform-origin: left; }
 .view-sub { color: var(--chalk-dim); margin: 0 0 18px; max-width: 70ch; }
@@ -139,7 +139,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 8px var(--gutter) 64px; posit
 .cols-2 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
 .cols-3 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
 
-/* ---------- Papier ---------- */
+/* ---------- Paper ---------- */
 .paper {
   position: relative;
   color: var(--ink);
@@ -152,7 +152,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 8px var(--gutter) 64px; posit
   box-shadow: var(--shadow-paper);
   padding: 16px 18px;
 }
-/* Wiebelige inktrand. */
+/* Wobbly ink border. */
 .paper::before {
   content: '';
   position: absolute;
@@ -187,7 +187,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 8px var(--gutter) 64px; posit
 .paper hr { border: 0; border-top: 2px dashed rgba(43,28,18,.25); margin: 12px 0; }
 .ink-label { font-family: var(--font-hand); font-size: 14px; letter-spacing: .5px; text-transform: uppercase; color: var(--ink-faint); }
 
-/* Donkere kaart (stenen tablet) voor secundaire inhoud. */
+/* Dark card (stone tablet) for secondary content. */
 .slab {
   background: linear-gradient(180deg, rgba(61,45,34,.85), rgba(36,25,18,.9));
   border: 2px solid #120c08;
@@ -196,7 +196,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 8px var(--gutter) 64px; posit
   padding: 14px 16px;
 }
 
-/* ---------- Knoppen ---------- */
+/* ---------- Buttons ---------- */
 .btn {
   font-family: var(--font-hand);
   font-size: 18px;
@@ -226,7 +226,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 8px var(--gutter) 64px; posit
 .btn svg { width: 18px; height: 18px; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
-/* ---------- Statusmarkeringen ---------- */
+/* ---------- Status markers ---------- */
 .badge {
   font-family: var(--font-hand);
   font-size: 14px;
@@ -243,16 +243,27 @@ main { max-width: 1240px; margin: 0 auto; padding: 8px var(--gutter) 64px; posit
 .badge.mild { color: #8a4b2a; background: rgba(160,90,40,.1); border-style: dotted; }
 .badge.hard { color: #fff; background: var(--blood); border-color: var(--blood); }
 .slab .badge.locked { color: var(--chalk-faint); }
+/* Item Quality: fill = dominant RGB of EID glyph {{QualityN}} (frames "Quality"
+   0-4 in eid_inline_icons.png), with dark ink and border for contrast.
+   Must stay equal to QUALITY_COLORS in unlock-info.js (tested). */
+.badge.quality { font-variant-numeric: tabular-nums; color: var(--ink); border-color: var(--ink); background: var(--q, transparent); }
+.badge.quality[data-quality="0"] { --q: #C2C2C2; }
+.badge.quality[data-quality="1"] { --q: #90FF51; }
+.badge.quality[data-quality="2"] { --q: #65D5FF; }
+.badge.quality[data-quality="3"] { --q: #FF54EC; }
+.badge.quality[data-quality="4"] { --q: #FFD100; }
+/* Item-like unlock without collectible Quality (trinket, card, rune, ...). */
+.badge.reward-type { color: var(--ink); border-style: dashed; background: rgba(0,0,0,.04); }
 
 .bar { height: 10px; background: rgba(43,28,18,.15); border: 1.5px solid var(--ink); border-radius: 6px 3px 5px 4px; overflow: hidden; }
 .bar > i { display: block; height: 100%; background: repeating-linear-gradient(-45deg, var(--blood) 0 6px, #8c1215 6px 12px); }
 .bar.gold > i { background: repeating-linear-gradient(-45deg, var(--gold) 0 6px, var(--gold-dark) 6px 12px); }
 
-/* Getekende bosssymbolen: stijl erft via <use> door naar de paden. */
+/* Drawn boss symbols: styling inherits through <use> down to the paths. */
 .gl { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .map .ico { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 
-/* ---------- Achievement-icoon ---------- */
+/* ---------- Achievement icon ---------- */
 .ach-ico { width: 40px; height: 40px; flex: none; border-radius: 4px; image-rendering: pixelated; background: var(--paper-3); box-shadow: 0 0 0 2px var(--ink); }
 .ach-ico.locked { filter: grayscale(1) brightness(.55) contrast(1.2); }
 .ach-ico.open { filter: grayscale(.65) brightness(.95); }
@@ -324,7 +335,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 8px var(--gutter) 64px; posit
 .log li { display: flex; gap: 8px; align-items: baseline; color: var(--chalk-dim); }
 .log time { font-family: var(--font-pixel); font-size: 12px; color: var(--chalk-faint); flex: none; }
 
-/* ---------- Personages: briefjes ---------- */
+/* ---------- Characters: notes ---------- */
 .char-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 232px), 1fr)); gap: 22px 18px; }
 .note { padding: 14px 14px 12px; cursor: pointer; transition: transform .15s; }
 .note:nth-child(3n) { transform: rotate(-.8deg); }
@@ -381,7 +392,7 @@ main { max-width: 1240px; margin: 0 auto; padding: 8px var(--gutter) 64px; posit
 .search::placeholder { color: var(--chalk-faint); }
 select.search { flex: 0 1 200px; }
 
-/* ---------- Lade (detail) ---------- */
+/* ---------- Drawer (detail) ---------- */
 .drawer-bg { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 60; animation: fade .2s; }
 .drawer {
   position: fixed;
@@ -404,6 +415,11 @@ select.search { flex: 0 1 200px; }
 .mark-line svg { width: 32px; height: 32px; }
 .mark-line .t { font-family: var(--font-hand); font-size: 18px; line-height: 1.1; }
 .mark-line .r { font-size: 14px; color: var(--ink-soft); }
+.mark-line.flash { animation: markflash 1.4s ease-out; }
+@keyframes markflash { 0%, 40% { background: rgba(255,209,0,.45); } 100% { background: transparent; } }
+.tier4-list { list-style: none; margin: 6px 0; padding: 0; display: grid; gap: 6px; }
+.tier4-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tier4-list button.mark-pill { cursor: pointer; color: inherit; }
 .lvl { display: inline-flex; border: 2px solid var(--ink); border-radius: 8px 3px 7px 4px; overflow: hidden; }
 .lvl button { border: 0; background: transparent; padding: 3px 9px 1px; font-family: var(--font-hand); font-size: 15px; cursor: pointer; color: var(--ink); }
 .lvl button + button { border-left: 1.5px solid var(--ink); }
@@ -416,7 +432,7 @@ select.search { flex: 0 1 200px; }
 .chain-list li { margin: 2px 0; }
 .chain-list li::before { content: '← '; color: var(--blood); font-family: var(--font-pixel); }
 
-/* ---------- Kaart (minimap) ---------- */
+/* ---------- Map (minimap) ---------- */
 .map-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
 @media (max-width: 980px) { .map-wrap { grid-template-columns: 1fr; } }
 .map-wrap > * { min-width: 0; }
@@ -440,7 +456,7 @@ select.search { flex: 0 1 200px; }
 .map-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 15px; color: var(--chalk-dim); margin-top: 10px; }
 .map-legend i { display: inline-block; width: 16px; height: 12px; vertical-align: -1px; margin-right: 6px; border: 2px solid; }
 
-/* ---------- Geheimen-lijst ---------- */
+/* ---------- Secrets list ---------- */
 .ach-list { display: grid; gap: 8px; }
 .ach {
   display: grid;
@@ -497,7 +513,7 @@ select.search { flex: 0 1 200px; }
 .step.done .st { background: var(--ink); color: var(--paper); }
 .step.current { box-shadow: var(--shadow-paper), 0 0 0 3px var(--gold), 0 0 24px rgba(227,178,60,.35); }
 .step.current::after {
-  content: 'JIJ BENT HIER';
+  content: 'YOU ARE HERE';
   position: absolute;
   top: -11px;
   right: 14px;
@@ -531,7 +547,7 @@ pre.cmd { background: #120c08; color: var(--chalk); border-radius: 8px; padding:
 .plus { color: #3e6a1f; font-family: var(--font-pixel); }
 .minus { color: var(--blood); font-family: var(--font-pixel); }
 
-/* ---------- Slot (inloggen) ---------- */
+/* ---------- Lock (login) ---------- */
 .lock {
   position: fixed;
   inset: 0;
@@ -558,7 +574,7 @@ pre.cmd { background: #120c08; color: var(--chalk); border-radius: 8px; padding:
 .pin-err { color: var(--blood-bright); min-height: 1.4em; margin-top: 12px; font-family: var(--font-hand); }
 .shake { animation: shake .4s; }
 
-/* ---------- Toasts (het "geheim ontgrendeld"-briefje) ---------- */
+/* ---------- Toasts (the "secret unlocked" note) ---------- */
 .toasts { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 80; display: grid; gap: 10px; width: min(420px, calc(100% - 32px)); pointer-events: none; }
 .toast { pointer-events: auto; display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; animation: drop .45s cubic-bezier(.2,1.4,.5,1); }
 .toast img { width: 52px; height: 52px; image-rendering: pixelated; border-radius: 4px; box-shadow: 0 0 0 2px var(--ink); }
@@ -570,7 +586,7 @@ pre.cmd { background: #120c08; color: var(--chalk); border-radius: 8px; padding:
 .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 65; display: grid; place-items: center; padding: 16px; animation: fade .2s; }
 .modal { width: min(560px, 100%); max-height: 90vh; overflow-y: auto; }
 
-footer { max-width: 1240px; margin: 0 auto; padding: 0 var(--gutter) 40px; color: var(--chalk-faint); font-size: 15px; position: relative; z-index: 1; }
+footer { max-width: 1240px; margin: 0 auto; padding: 0 var(--gutter) 40px; color: var(--chalk-faint); font-size: 15px; position: relative; z-index: 1; text-align: center; }
 footer a { color: var(--chalk-dim); }
 
 .empty { text-align: center; color: var(--chalk-dim); padding: 30px 10px; }

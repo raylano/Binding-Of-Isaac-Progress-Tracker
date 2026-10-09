@@ -4,15 +4,18 @@ services:
     image: boipt:latest
     container_name: boipt
     restart: unless-stopped
-    # Alleen op localhost: nginx zet hem op isaac.wolfs.dev met HTTPS.
+    # Localhost only: nginx publishes it with HTTPS.
     ports:
       - "127.0.0.1:${PORT:-8090}:8080"
     volumes:
-      # accounts, sessies en voortgang blijven hier staan, ook na een rebuild
+      # Accounts, sessions, settings and progress survive rebuilds here.
       - ./data:/data
+    # Values come from .env next to this file (see .env.example).
     environment:
-      # Alleen nodig om de oude voortgang van vóór de accounts over te nemen.
-      ACCESS_PIN: "${ACCESS_PIN:-}"
-      STEAM_ID: "${STEAM_ID:-}"
+      PUBLIC_URL: "${PUBLIC_URL:-}"
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-}"
+      # One-time: only read when the admin account does not exist yet. Empty it
+      # in .env after the first start and run `docker compose up -d` again.
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
       STEAM_API_KEY: "${STEAM_API_KEY:-}"
       TRUST_PROXY: "${TRUST_PROXY:-1}"

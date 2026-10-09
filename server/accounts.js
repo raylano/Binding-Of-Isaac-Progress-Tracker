@@ -1,10 +1,10 @@
-// Accounts en sessies, elk als één JSON-bestand in de datamap. De bestanden
-// worden bij de eerste aanvraag ingelezen en daarna in het geheugen bijgehouden;
-// elke wijziging wordt meteen (atomisch) weggeschreven. Dat werkt omdat er één
-// serverproces is: draai deze app niet met meerdere processen op één datamap.
+// Accounts and sessions, each as a single JSON file in the data directory. The
+// files are read on the first request and then kept in memory; every change is
+// written out immediately (atomically). That works because there is one server
+// process: do not run this app with multiple processes on one data directory.
 //
-// Sessietokens zijn 32 willekeurige bytes. Op schijf staat alleen de SHA-256
-// ervan, zodat een gelekt sessions.json geen geldige cookies oplevert.
+// Session tokens are 32 random bytes. Only their SHA-256 is stored on disk, so
+// a leaked sessions.json does not yield any valid cookies.
 
 import crypto from 'node:crypto';
 import path from 'node:path';
@@ -50,8 +50,8 @@ export const getUser = (id) => db().users.get(id) || null;
 
 export class AccountExists extends Error {}
 
-// Het hashen gebeurt vóór deze aanroep (async); de controle op dubbele adressen
-// en het toevoegen gebeuren hier zonder await ertussen, dus zonder race.
+// Hashing happens before this call (async); the duplicate-address check and the
+// insert happen here with no await in between, so there is no race.
 export async function createUser(email, passwordHash) {
   if (findUserByEmail(email)) throw new AccountExists();
   const user = {
@@ -89,7 +89,7 @@ export async function createSession(user, { kind = 'browser', label = '', userAg
     expiresAt: now + SESSION_TTL[kind],
   };
   const { sessions: all } = db();
-  // Verlopen sessies opruimen en per account een plafond, oudste eerst eruit.
+  // Clean up expired sessions and cap the count per account, oldest removed first.
   for (const [k, s] of all) if (s.expiresAt <= now) all.delete(k);
   const mine = [...all.values()].filter((s) => s.userId === user.id).sort((a, b) => a.lastSeen - b.lastSeen);
   for (const s of mine.slice(0, Math.max(0, mine.length - MAX_SESSIONS_PER_USER + 1))) all.delete(s.tokenHash);
@@ -98,8 +98,8 @@ export async function createSession(user, { kind = 'browser', label = '', userAg
   return { token, session };
 }
 
-// Geeft { user, session } terug, of null. kind moet kloppen: een browsercookie
-// werkt niet als bearer-token en andersom.
+// Returns { user, session }, or null. kind must match: a browser cookie does
+// not work as a bearer token, and vice versa.
 export function resolveSession(token, kind) {
   if (typeof token !== 'string' || token.length < 40 || token.length > 100) return null;
   const { sessions: all } = db();

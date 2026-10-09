@@ -1,7 +1,7 @@
-// Accounts: registratie, wachtwoord-login, sessies, isolatie per account,
-// eenmalige overname van de oude PIN-voortgang en sync-tokens.
-// Elke test gebruikt een eigen X-Forwarded-For zodat de rate limits per IP
-// elkaar niet beïnvloeden.
+// Accounts: registration, password login, sessions, per-account isolation and
+// sync tokens. Registration closed/open and the admin toggle: registration.test.js.
+// Each test uses its own X-Forwarded-For so the per-IP rate limits do not
+// affect each other.
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,13 +11,12 @@ import path from 'node:path';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'boipt-acc-'));
 process.env.DATA_DIR = dir;
-process.env.ACCESS_PIN = '4242';
 process.env.TRUST_PROXY = '1';
-process.env.STEAM_ID = '76561197960287930';
-
-// Bestaande single-user voortgang van vóór de accounts.
-const LEGACY = { version: 1, achievements: [5, 6, 7], updatedAt: '2026-01-01T00:00:00.000Z' };
-fs.writeFileSync(path.join(dir, 'progress.json'), JSON.stringify(LEGACY));
+// Registration is closed by default; this isolated data dir starts with
+// registration open, so the tests can create accounts.
+fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ version: 1, registrationOpen: true }));
+// Leftover from before accounts existed: must not show up anywhere anymore.
+fs.writeFileSync(path.join(dir, 'progress.json'), JSON.stringify({ version: 1, achievements: [5, 6, 7], updatedAt: '2026-01-01T00:00:00.000Z' }));
 
 let server;
 let base;
@@ -76,7 +75,7 @@ function fakeSave(achievements) {
   return buf;
 }
 
-// ---------- Registratie ----------
+// ---------- Registration ----------
 
 test('registratie: ongeldig e-mailadres of zwak wachtwoord = 400', async () => {
   const ip = freshIp();
@@ -171,13 +170,18 @@ test('login: ook geslaagde pogingen zijn per IP begrensd (scrypt is duur)', asyn
   assert.equal(codes[30], 429);
 });
 
-test('oude PIN-login en PIN als bearer werken niet meer', async () => {
+test('oude PIN-login, PIN als bearer en PIN-overname bestaan niet meer', async () => {
   const ip = freshIp();
   assert.equal((await call('/login', { method: 'POST', body: { pin: '4242' }, ip })).status, 400);
   assert.equal((await call('/progress', { bearer: '4242', ip })).status, 401);
+  const { cookie } = await register();
+  const claim = await call('/legacy/claim', { method: 'POST', cookie, body: { pin: '4242' }, ip });
+  assert.equal(claim.status, 404);
+  const session = await (await call('/session', { cookie })).json();
+  assert.equal(session.legacy, undefined);
 });
 
-// ---------- Sessies en uitloggen ----------
+// ---------- Sessions and logout ----------
 
 test('uitloggen trekt de sessie op de server in', async () => {
   const { cookie } = await register();
@@ -201,7 +205,7 @@ test('sessie-overzicht: eigen sessies zien en een andere intrekken', async () =>
   }
   const phone = list.sessions.find((s) => !s.current);
   assert.equal(phone.userAgent, 'Telefoon');
-  // Een ander account kan deze sessie niet intrekken.
+  // Another account cannot revoke this session.
   assert.equal((await call(`/sessions/${phone.id}`, { method: 'DELETE', cookie: stranger.cookie })).status, 404);
   assert.equal((await call('/progress', { cookie: other })).status, 200);
   assert.equal((await call(`/sessions/${phone.id}`, { method: 'DELETE', cookie })).status, 200);
@@ -220,7 +224,7 @@ test('cookie-verzoek met vreemde Origin wordt geweigerd', async () => {
   assert.equal(res.status, 403);
 });
 
-// ---------- Isolatie ----------
+// ---------- Isolation ----------
 
 test('voortgang is strikt per account', async () => {
   const a = await register();
@@ -251,12 +255,12 @@ test('sources uit de client worden tot bekende, veilige velden teruggebracht', a
   assert.equal(typeof saved.sources.steam.count, 'number');
 });
 
-test('nieuw account ziet de oude PIN-voortgang nooit', async () => {
+test('nieuw account begint leeg: geen oude data/progress.json, geen SteamID', async () => {
   const { cookie } = await register();
   const p = await (await call('/progress', { cookie })).json();
   assert.deepEqual(p.achievements ?? [], []);
   const cfg = await (await call('/config', { cookie })).json();
-  assert.equal(cfg.steamId, null, 'STEAM_ID uit .env hoort bij de eigenaar, niet bij nieuwe accounts');
+  assert.equal(cfg.steamId, null);
   assert.equal(cfg.accountId, null);
 });
 
@@ -271,7 +275,7 @@ test('steam: zonder eigen SteamID = 400, en SteamID is per account', async () =>
   assert.equal((await (await call('/config', { cookie: b.cookie })).json()).steamId, null);
 });
 
-// ---------- Sync-token (bearer) ----------
+// ---------- Sync token (bearer) ----------
 
 test('sync-token: save komt alleen bij het eigen account', async () => {
   const a = await register();
@@ -295,49 +299,4 @@ test('sync-token: fout wachtwoord = 401, onbekend token = 401', async () => {
   const a = await register();
   assert.equal((await call('/token', { method: 'POST', body: { email: a.email, password: 'verkeerd wachtwoord' }, ip: freshIp() })).status, 401);
   assert.equal((await call('/progress', { bearer: 'x'.repeat(43), ip: freshIp() })).status, 401);
-});
-
-// ---------- Oude voortgang overnemen ----------
-
-test('legacy: overnemen kan alleen met de juiste PIN, precies één keer', async () => {
-  const owner = await register();
-  const intruder = await register();
-
-  const s0 = await (await call('/session', { cookie: owner.cookie })).json();
-  assert.equal(s0.legacy.available, true);
-
-  const wrong = await call('/legacy/claim', { method: 'POST', cookie: intruder.cookie, body: { pin: '0000' }, ip: freshIp() });
-  assert.equal(wrong.status, 403);
-  assert.deepEqual((await (await call('/progress', { cookie: intruder.cookie })).json()).achievements ?? [], []);
-
-  const ok = await call('/legacy/claim', { method: 'POST', cookie: owner.cookie, body: { pin: '4242' }, ip: freshIp() });
-  assert.equal(ok.status, 200, await ok.clone().text());
-  const mine = await (await call('/progress', { cookie: owner.cookie })).json();
-  assert.deepEqual(mine.achievements, [5, 6, 7]);
-  assert.equal((await (await call('/config', { cookie: owner.cookie })).json()).steamId, '76561197960287930', 'eigenaar erft STEAM_ID');
-
-  // Tweede keer: niet door de eigenaar, en ook niet door iemand anders met de goede PIN.
-  assert.equal((await call('/legacy/claim', { method: 'POST', cookie: owner.cookie, body: { pin: '4242' }, ip: freshIp() })).status, 409);
-  assert.equal((await call('/legacy/claim', { method: 'POST', cookie: intruder.cookie, body: { pin: '4242' }, ip: freshIp() })).status, 409);
-  assert.deepEqual((await (await call('/progress', { cookie: intruder.cookie })).json()).achievements ?? [], []);
-  assert.equal((await (await call('/session', { cookie: intruder.cookie })).json()).legacy.available, false);
-
-  // Het oude bestand blijft als back-up bestaan, maar wordt niet meer gebruikt.
-  assert.ok(fs.existsSync(path.join(dir, 'legacy-claim.json')));
-});
-
-test('legacy: gelijktijdige claims leveren precies één winnaar op', async () => {
-  // Nieuwe legacy-data in een aparte map zou een nieuw proces vereisen; hier
-  // controleren we dat na de claim hierboven alle parallelle pogingen 409 geven.
-  const users = await Promise.all([register(), register(), register()]);
-  const codes = await Promise.all(users.map((u) => call('/legacy/claim', { method: 'POST', cookie: u.cookie, body: { pin: '4242' }, ip: freshIp() }).then((r) => r.status)));
-  assert.deepEqual(codes, [409, 409, 409]);
-});
-
-test('legacy: foute PIN telt mee voor de rate limit', async () => {
-  const u = await register();
-  const ip = freshIp();
-  const codes = [];
-  for (let i = 0; i < 6; i++) codes.push((await call('/legacy/claim', { method: 'POST', cookie: u.cookie, body: { pin: '1111' }, ip })).status);
-  assert.equal(codes[5], 429);
 });

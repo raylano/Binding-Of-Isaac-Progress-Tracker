@@ -1,8 +1,8 @@
-// Vaste spelgegevens: de 12 completion marks en de 34 personages.
+// Fixed game data: the 12 completion marks and the 34 characters.
 //
-// De volgorde van MARKS en CHARACTERS is de volgorde in het save-bestand en mag dus
-// niet veranderen. Geverifieerd tegen de EventCounter-lijst van REPENTOGON
-// (repentogon.com/enums/EventCounter.html) en tegen een echte Repentance+-save.
+// The order of MARKS and CHARACTERS is the order in the save file and so must not
+// change. Verified against REPENTOGON's EventCounter list
+// (repentogon.com/enums/EventCounter.html) and against a real Repentance+ save.
 
 export const MARKS = [
   { key: 'heart', short: 'MH', name: "Mom's Heart", long: "Mom's Heart / It Lives!" },
@@ -21,17 +21,17 @@ export const MARKS = [
 
 export const MARK_INDEX = Object.fromEntries(MARKS.map((m, i) => [m.key, i]));
 
-// Weergavevolgorde op het briefje, zoals in het spel: eerst het verhaal, dan de
-// zijtakken, dan Repentance.
+// Display order on the note, as in the game: first the story, then the side
+// branches, then Repentance.
 export const MARK_DISPLAY = [
   'heart', 'isaac', 'bluebaby', 'satan', 'lamb', 'megasatan',
   'bossrush', 'hush', 'delirium', 'greed', 'mother', 'beast',
 ];
 
-// Wat je moet hebben ontgrendeld voordat een eindbaas bereikbaar is. Achievement-ID's;
-// een array in een array betekent "een van deze".
+// What you must have unlocked before a final boss is reachable. Achievement IDs;
+// an array inside an array means "one of these".
 //   4   The Womb        57  The Polaroid (The Chest)   78  The Negative (Dark Room)
-//   155 Angels (sleutelstukken)   234 Blue Womb   320 The Void   407 A Secret Exit
+//   155 Angels (key pieces)       234 Blue Womb   320 The Void   407 A Secret Exit
 //   635 A Strange Door  341 Greedier!
 export const MARK_REQUIRES = {
   heart: [4],
@@ -48,7 +48,7 @@ export const MARK_REQUIRES = {
   beast: [635],
 };
 
-// Hard-variant van Greed heet Greedier en heeft een eigen vergrendeling.
+// The Hard variant of Greed is called Greedier and has its own lock.
 export const GREEDIER = 341;
 
 const BASE = [
@@ -71,7 +71,7 @@ const BASE = [
   { key: 'jacob', name: 'Jacob and Esau', unlock: 405, short: 'Jacob & Esau' },
 ];
 
-// Tainted-namen zoals de wiki ze in "as Tainted X" gebruikt.
+// Tainted names as the wiki uses them in "as Tainted X".
 const TAINTED_WIKI = {
   lost: 'Tainted Lost',
   forgotten: 'Tainted Forgotten',
@@ -88,7 +88,7 @@ export const CHARACTERS = [
     index: BASE.length + i,
     tainted: true,
     base: c.key,
-    // De kast in Home: 474 (Isaac) t/m 490 (Jacob and Esau), in save-volgorde.
+    // The closet in Home: 474 (Isaac) through 490 (Jacob and Esau), in save order.
     unlock: 474 + i,
   })),
 ];

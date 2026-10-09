@@ -3,11 +3,12 @@ import path from 'node:path';
 import express from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { config, ROOT } from './config.js';
-import { authenticate, requireAuth, sameOrigin, pinMatches, setSessionCookie, clearSessionCookie } from './auth.js';
+import { authenticate, requireAuth, sameOrigin, setSessionCookie, clearSessionCookie } from './auth.js';
 import { createUser, findUserByEmail, updateUser, createSession, listSessions, revokeSession, AccountExists } from './accounts.js';
 import { normalizeEmail, emailProblem, passwordProblem, hashPassword, verifyPassword, burnPasswordCheck } from './passwords.js';
-import { readProgress, updateProgress, sanitize, legacyAvailable, claimLegacy, ClaimError } from './store.js';
+import { readProgress, updateProgress, sanitize } from './store.js';
 import { steamAchievements, SteamError, STEAM_ID } from './steam.js';
+import { getSettings, updateSettings, isAdmin, bootstrapAdmin } from './admin.js';
 import { parseSave, SaveError } from '../web/js/save-parser.js';
 import { buildModel, applySave, applySteam, normalizeState } from '../web/js/logic.js';
 
@@ -21,7 +22,7 @@ const limiter = (windowMs, limit, extra = {}) => rateLimit({
   limit,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
-  message: { error: 'Rustig aan: te veel verzoeken. Probeer het zo opnieuw.' },
+  message: { error: 'Slow down: too many requests. Try again shortly.' },
   ...extra,
 });
 
@@ -50,30 +51,20 @@ export function createApp() {
     next();
   });
 
-  // Foute wachtwoorden: 5 per 15 minuten per IP. Bewust geen harde grens per
-  // account: die laat een vreemde de eigenaar buitensluiten (zie README).
-  // Daarnaast hoogstens 30 pogingen per IP per kwartier, ook geslaagde: elke
-  // poging kost een scrypt-berekening.
+  // Wrong passwords: 5 per 15 minutes per IP. Deliberately no hard limit per
+  // account: that would let a stranger lock the owner out (see README).
+  // On top of that at most 30 attempts per IP per 15 minutes, successful ones
+  // included: every attempt costs a scrypt computation.
   const failed = (req, res) => res.statusCode < 400 || res.statusCode === 400 || res.statusCode === 409;
   const loginIpLimiter = limiter(15 * 60_000, 5, {
     skipSuccessfulRequests: true,
     requestWasSuccessful: failed,
-    message: { error: 'Te veel foute pogingen. Wacht een kwartier.' },
+    message: { error: 'Too many failed attempts. Wait 15 minutes.' },
   });
-  const loginAttemptLimiter = limiter(15 * 60_000, 30, { message: { error: 'Te veel inlogpogingen. Wacht een kwartier.' } });
-  // Nieuwe accounts: 10 pogingen per uur per IP.
-  const registerLimiter = limiter(60 * 60_000, 10, { message: { error: 'Te veel nieuwe accounts vanaf dit adres. Probeer het later.' } });
-  // De oude PIN is kort: per IP 5 fouten per kwartier, en voor iedereen samen
-  // hoogstens 20 per uur. Liever even geen claim mogelijk dan een geraden PIN.
-  const pinFailed = (req, res) => res.statusCode !== 403;
-  const claimIpLimiter = limiter(15 * 60_000, 5, { skipSuccessfulRequests: true, requestWasSuccessful: pinFailed, message: { error: 'Te veel foute PINs. Wacht een kwartier.' } });
-  const claimGlobalLimiter = limiter(60 * 60_000, 20, {
-    skipSuccessfulRequests: true,
-    requestWasSuccessful: pinFailed,
-    keyGenerator: () => 'legacy-claim',
-    message: { error: 'Te veel foute PINs. Probeer het over een uur opnieuw.' },
-  });
-  // Onbekende bearer-tokens: niet te raden (256 bits), maar ook niet gratis.
+  const loginAttemptLimiter = limiter(15 * 60_000, 30, { message: { error: 'Too many login attempts. Wait 15 minutes.' } });
+  // Registration: 10 attempts per hour per IP, counted even while registration is closed.
+  const registerLimiter = limiter(60 * 60_000, 10, { message: { error: 'Too many sign-up attempts from this address. Try again later.' } });
+  // Unknown bearer tokens: impossible to guess (256 bits), but not free either.
   const bearerLimiter = limiter(15 * 60_000, 20, { skipSuccessfulRequests: true, requestWasSuccessful: (req, res) => res.statusCode !== 401 });
   const json = express.json({ limit: '2kb' });
 
@@ -86,16 +77,17 @@ export function createApp() {
   api.get('/session', (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     const found = authenticate(req);
-    if (!found) return res.json({ authed: false });
-    res.json({ authed: true, user: { email: found.user.email }, legacy: { available: legacyAvailable() } });
+    const { registrationOpen } = getSettings();
+    if (!found) return res.json({ authed: false, registrationOpen });
+    res.json({ authed: true, user: { email: found.user.email, admin: isAdmin(found.user) }, registrationOpen });
   });
 
-  // Gemeenschappelijk voor registreren, inloggen en sync-token: velden lezen en
-  // controleren. Geeft null terug als er al een antwoord is gestuurd.
+  // Shared by register, login and sync token: read and check the fields.
+  // Returns null if a response has already been sent.
   function credentials(req, res) {
     const { email: rawEmail, password } = req.body || {};
     if (typeof rawEmail !== 'string' || typeof password !== 'string') {
-      res.status(400).json({ error: 'Vul je e-mailadres en wachtwoord in.' });
+      res.status(400).json({ error: 'Enter your email address and password.' });
       return null;
     }
     return { email: normalizeEmail(rawEmail), password };
@@ -108,19 +100,25 @@ export function createApp() {
   }
 
   const userAgent = (req) => req.headers['user-agent'] || '';
-  const BAD_LOGIN = { error: 'Onbekend e-mailadres of verkeerd wachtwoord.' };
+  const BAD_LOGIN = { error: 'Unknown email address or wrong password.' };
+  const CLOSED = { error: 'New accounts are currently not being accepted.' };
+  const EXISTS = { error: 'An account with this email address already exists. Log in instead.' };
 
   api.post('/register', registerLimiter, json, async (req, res) => {
+    // Checked before anything else (and before hashing): closed means closed.
+    if (!getSettings().registrationOpen) return res.status(403).json(CLOSED);
     const cred = credentials(req, res);
     if (!cred) return;
+    // The admin address is created by bootstrapAdmin only, never via sign-up.
+    if (config.adminEmail && cred.email === config.adminEmail) return res.status(403).json(CLOSED);
     const problem = emailProblem(cred.email) || passwordProblem(cred.password, cred.email);
     if (problem) return res.status(400).json({ error: problem });
-    if (findUserByEmail(cred.email)) return res.status(409).json({ error: 'Er bestaat al een account met dit e-mailadres. Log in.' });
+    if (findUserByEmail(cred.email)) return res.status(409).json(EXISTS);
     let user;
     try {
       user = await createUser(cred.email, await hashPassword(cred.password));
     } catch (err) {
-      if (err instanceof AccountExists) return res.status(409).json({ error: 'Er bestaat al een account met dit e-mailadres. Log in.' });
+      if (err instanceof AccountExists) return res.status(409).json(EXISTS);
       throw err;
     }
     const { token } = await createSession(user, { kind: 'browser', userAgent: userAgent(req) });
@@ -133,14 +131,14 @@ export function createApp() {
     if (!cred) return;
     const user = await checkPassword(cred.email, cred.password);
     if (!user) return res.status(401).json(BAD_LOGIN);
-    // Altijd een nieuw token: een vooraf geplante cookie wordt nooit hergebruikt.
+    // Always a new token: a pre-planted cookie is never reused.
     const { token } = await createSession(user, { kind: 'browser', userAgent: userAgent(req) });
     setSessionCookie(req, res, token);
     res.json({ ok: true, user: { email: user.email } });
   });
 
-  // Token voor tools/sync-save.ps1. Geen cookie; het script bewaart het token
-  // versleuteld (DPAPI) en kan het via het sessie-overzicht kwijtraken.
+  // Token for tools/sync-save.ps1. No cookie; the script stores the token
+  // encrypted (DPAPI) and it can be revoked from the session list.
   api.post('/token', loginAttemptLimiter, loginIpLimiter, json, async (req, res) => {
     const cred = credentials(req, res);
     if (!cred) return;
@@ -178,22 +176,29 @@ export function createApp() {
 
   api.delete('/sessions/:id', async (req, res) => {
     if (!/^[a-f0-9]{16}$/.test(req.params.id) || !(await revokeSession(req.user.id, req.params.id))) {
-      return res.status(404).json({ error: 'Sessie niet gevonden.' });
+      return res.status(404).json({ error: 'Session not found.' });
     }
     res.json({ ok: true });
   });
 
-  api.post('/legacy/claim', claimGlobalLimiter, claimIpLimiter, json, async (req, res) => {
-    if (!pinMatches(req.body?.pin)) return res.status(403).json({ error: 'Verkeerde PIN.' });
-    try {
-      const saved = await claimLegacy(req.user.id, MAX_ID);
-      // De STEAM_ID uit .env hoorde bij de oude eigenaar.
-      if (!req.user.steamId && STEAM_ID.test(config.steamId)) await updateUser(req.user.id, { steamId: config.steamId });
-      res.json({ ok: true, progress: saved });
-    } catch (err) {
-      if (err instanceof ClaimError) return res.status(409).json({ error: err.message });
-      throw err;
-    }
+  // Admin only, and only from a browser session: a sync token can upload saves
+  // but never change site settings.
+  function requireAdmin(req, res, next) {
+    if (req.session.kind !== 'browser' || !isAdmin(req.user)) return res.status(403).json({ error: 'Admins only.' });
+    next();
+  }
+
+  api.get('/admin/settings', requireAdmin, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(getSettings());
+  });
+
+  api.put('/admin/settings', requireAdmin, json, async (req, res) => {
+    const open = req.body?.registrationOpen;
+    if (typeof open !== 'boolean') return res.status(400).json({ error: 'registrationOpen must be true or false.' });
+    const saved = await updateSettings({ registrationOpen: open });
+    console.log(`Registration ${open ? 'opened' : 'closed'} by the admin.`);
+    res.json(saved);
   });
 
   const accountId = (steamId) => (steamId ? String(BigInt(steamId) - 76561197960265728n) : null);
@@ -205,7 +210,9 @@ export function createApp() {
       email: req.user.email,
       steamId,
       steamKey: Boolean(config.steamKey),
-      // Steam bewaart saves onder userdata/<account-ID>; dat is SteamID64 min de basis.
+      // Public address for the sync-script command; the page falls back to its own origin.
+      publicUrl: config.publicUrl || null,
+      // Steam stores saves under userdata/<account ID>, which is SteamID64 minus the base.
       accountId: accountId(steamId),
     });
   });
@@ -213,7 +220,7 @@ export function createApp() {
   api.put('/account', json, async (req, res) => {
     const raw = req.body?.steamId;
     const steamId = raw === null || raw === '' ? null : String(raw ?? '').trim();
-    if (steamId !== null && !STEAM_ID.test(steamId)) return res.status(400).json({ error: 'Een SteamID64 is 17 cijfers en begint met 7656119.' });
+    if (steamId !== null && !STEAM_ID.test(steamId)) return res.status(400).json({ error: 'A SteamID64 is 17 digits and starts with 7656119.' });
     await updateUser(req.user.id, { steamId });
     res.json({ ok: true, steamId, accountId: accountId(steamId) });
   });
@@ -225,9 +232,9 @@ export function createApp() {
 
   api.put('/progress', limiter(60_000, 60), express.json({ limit: '256kb' }), async (req, res) => {
     const body = req.body;
-    if (!body || typeof body !== 'object' || !body.state || typeof body.state !== 'object') return res.status(400).json({ error: 'Geen voortgang meegestuurd.' });
-    // Optimistische vergrendeling: is de server intussen nieuwer (ander apparaat),
-    // dan krijgt de client de nieuwe stand terug in plaats van die te overschrijven.
+    if (!body || typeof body !== 'object' || !body.state || typeof body.state !== 'object') return res.status(400).json({ error: 'No progress was sent.' });
+    // Optimistic locking: if the server is newer (another device), the client
+    // gets the newer state back instead of overwriting it.
     let conflict = null;
     const { saved } = await updateProgress(req.user.id, (current) => {
       if (current?.updatedAt && body.base !== undefined && body.base !== current.updatedAt) {
@@ -236,12 +243,12 @@ export function createApp() {
       }
       return sanitize(body.state, MAX_ID);
     });
-    if (conflict) return res.status(409).json({ error: 'Er is intussen op een ander apparaat iets veranderd.', current: conflict });
+    if (conflict) return res.status(409).json({ error: 'Something changed on another device in the meantime.', current: conflict });
     res.json(saved);
   });
 
-  // Ruwe save-upload (voor tools/sync-save.ps1). De save is leidend; handmatige
-  // vinkjes blijven staan zodat er nooit stilletjes iets verdwijnt.
+  // Raw save upload (for tools/sync-save.ps1). The save is authoritative; manual
+  // ticks stay so nothing silently disappears.
   api.post('/save', limiter(60_000, 20), express.raw({ type: () => true, limit: '64kb' }), async (req, res) => {
     let save;
     try {
@@ -273,11 +280,11 @@ export function createApp() {
       res.json(data);
     } catch (err) {
       if (err instanceof SteamError) return res.status(err.status).json({ error: err.message });
-      res.status(502).json({ error: 'Steam is niet bereikbaar.' });
+      res.status(502).json({ error: 'Steam is unreachable.' });
     }
   });
 
-  api.use((req, res) => res.status(404).json({ error: 'Onbekend endpoint.' }));
+  api.use((req, res) => res.status(404).json({ error: 'Unknown endpoint.' }));
 
   app.use('/api', api);
 
@@ -293,17 +300,19 @@ export function createApp() {
 
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
-    if (err.type === 'entity.too.large') return res.status(413).json({ error: 'Te groot.' });
-    if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Ongeldige JSON.' });
+    if (err.type === 'entity.too.large') return res.status(413).json({ error: 'Too large.' });
+    if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Invalid JSON.' });
     console.error(err);
-    res.status(500).json({ error: 'Er ging iets mis op de server.' });
+    res.status(500).json({ error: 'Something went wrong on the server.' });
   });
 
   return app;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.join(ROOT, 'server', 'index.js')) {
+  // The admin account must exist before anyone can reach the sign-up route.
+  await bootstrapAdmin();
   createApp().listen(config.port, config.host, () => {
-    console.log(`BOIPT draait op http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}`);
+    console.log(`BasementDiary is running on http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}`);
   });
 }

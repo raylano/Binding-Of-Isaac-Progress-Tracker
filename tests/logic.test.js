@@ -140,7 +140,7 @@ test('unlock-uitleg: elke route-achievement heeft een eigen uitleg, geen fallbac
     assert.equal(e.known, true, name);
     assert.ok(e.text.length > 15, name);
   }
-  // Meerdere achievements in één stap krijgen elk hun eigen tekst.
+  // Multiple achievements in one step each get their own text.
   for (const s of ROUTE.filter((r) => r.ach.length > 1)) {
     const known = s.ach.filter((id) => id in UNLOCK_EFFECTS).map((id) => effectOf(model, id).text);
     assert.equal(new Set(known).size, known.length, s.key);
@@ -156,7 +156,7 @@ test('unlock-uitleg: bekende items en personages krijgen specifieke werking', as
   const character = effectOf(model, 1);
   assert.equal(character.known, true);
   assert.match(character.text, /Magdalene/);
-  assert.match(character.text, /hartcontainers/i);
+  assert.match(character.text, /heart containers/i);
 });
 
 test('unlock-uitleg: onbekende ID houdt een veilige wiki-fallback', async () => {

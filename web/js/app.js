@@ -10,23 +10,27 @@ import * as sync from './views/sync.js';
 
 const ROUTES = {
   '': dashboard,
-  personages: characters,
-  kaart: mapView,
-  geheimen: secrets,
+  characters,
+  map: mapView,
+  secrets,
   route: routeView,
   sync,
 };
 
+// Old (Dutch) hash routes from bookmarks keep working.
+const ALIASES = { personages: 'characters', kaart: 'map', geheimen: 'secrets' };
+
 let current = null;
 
 function parseHash() {
-  const [name = '', ...rest] = location.hash.replace(/^#\/?/, '').split('/');
+  const [raw = '', ...rest] = location.hash.replace(/^#\/?/, '').split('/');
+  const name = ALIASES[raw] || raw;
   return { name, arg: rest.join('/') ? decodeURIComponent(rest.join('/')) : null };
 }
 
 function renderHud() {
   const t = totals(store.model, store.state);
-  // 12 hartjes = alle 641 achievements, zoals een volle hartenbalk.
+  // 12 hearts = all 641 achievements, like a full health bar.
   const units = (t.achievements / t.achievementsTotal) * 24;
   let hearts = '';
   for (let i = 0; i < 12; i++) {
@@ -34,14 +38,14 @@ function renderHud() {
     hearts += pixel(left >= 2 ? 'heart' : left >= 1 ? 'half' : 'empty');
   }
   $('#hud-hearts').innerHTML = hearts;
-  $('#hud-hearts').title = `${t.achievements} van ${t.achievementsTotal} geheimen`;
+  $('#hud-hearts').title = `${t.achievements} of ${t.achievementsTotal} secrets`;
   $('#hud-stats').innerHTML = `
-    <span class="stat" title="Geheimen (achievements)">${pixel('coin', 'Geheimen')}${t.achievements}<small>/${t.achievementsTotal}</small></span>
-    <span class="stat" title="Completion marks (waarvan op Hard: ${t.hard})">${pixel('bomb', 'Marks')}${t.marks}<small>/${t.marksTotal}</small></span>
-    <span class="stat" title="Personages">${pixel('key', 'Personages')}${t.chars}<small>/${t.charsTotal}</small></span>`;
+    <span class="stat" title="Secrets (achievements)">${pixel('coin', 'Secrets')}${t.achievements}<small>/${t.achievementsTotal}</small></span>
+    <span class="stat" title="Completion marks (on Hard: ${t.hard})">${pixel('bomb', 'Marks')}${t.marks}<small>/${t.marksTotal}</small></span>
+    <span class="stat" title="Characters">${pixel('key', 'Characters')}${t.chars}<small>/${t.charsTotal}</small></span>`;
   const pill = $('#sync-pill');
   pill.className = `sync-pill ${store.status === 'saving' ? 'busy' : store.status === 'error' ? 'err' : ''}`;
-  pill.querySelector('span').textContent = store.status === 'saving' ? 'opslaan…' : store.status === 'error' ? 'niet opgeslagen' : 'opgeslagen';
+  pill.querySelector('span').textContent = store.status === 'saving' ? 'saving…' : store.status === 'error' ? 'not saved' : 'saved';
 }
 
 function render() {
@@ -67,9 +71,9 @@ function render() {
   renderHud();
 }
 
-// ---------- Slot: inloggen of registreren ----------
+// ---------- Lock: log in or register ----------
 let authMode = 'login';
-function showLock(message = '') {
+function showLock(message = '', registrationOpen = false) {
   closeDrawer(true);
   $('#hud').hidden = true;
   $('#footer').hidden = true;
@@ -81,16 +85,20 @@ function showLock(message = '') {
   const err = $('#pin-err');
   err.textContent = message;
   form.password.value = '';
+  // The sign-up tab only appears while an admin has registration open; the
+  // server refuses sign-ups otherwise anyway.
+  lock.querySelector('.auth-tabs').hidden = !registrationOpen;
+  if (!registrationOpen) authMode = 'login';
 
   const setMode = (mode) => {
     authMode = mode;
     for (const b of lock.querySelectorAll('[data-mode]')) b.setAttribute('aria-selected', String(b.dataset.mode === mode));
     $('#auth-hint').hidden = mode !== 'register';
     form.password.autocomplete = mode === 'register' ? 'new-password' : 'current-password';
-    $('#auth-submit').textContent = mode === 'register' ? 'Account maken' : 'Naar binnen';
+    $('#auth-submit').textContent = mode === 'register' ? 'Create account' : 'Enter';
     $('#auth-intro').textContent = mode === 'register'
-      ? 'Maak een account; je voortgang is alleen van jou.'
-      : 'Log in om je eigen kelder in te gaan.';
+      ? 'Create an account; your progress belongs only to you.'
+      : 'Log in to enter your own basement.';
   };
   setMode(authMode);
   lock.querySelector('.auth-tabs').onclick = (e) => {
@@ -102,7 +110,7 @@ function showLock(message = '') {
     e.preventDefault();
     const email = form.email.value.trim();
     const password = form.password.value;
-    if (!email || !password) { err.textContent = 'Vul je e-mailadres en wachtwoord in.'; return; }
+    if (!email || !password) { err.textContent = 'Enter your email address and password.'; return; }
     $('#auth-submit').disabled = true;
     try {
       await api(authMode === 'register' ? '/register' : '/login', {
@@ -126,20 +134,28 @@ function showLock(message = '') {
   (form.email.value ? form.password : form.email).focus();
 }
 
+async function lockScreen(message = '') {
+  let open = false;
+  try {
+    open = (await api('/session')).registrationOpen === true;
+  } catch { /* server unreachable: show login only */ }
+  showLock(message, open);
+}
+
 let started = false;
 async function start() {
   try {
     await loadAll();
   } catch (err) {
-    if (err instanceof AuthError) return showLock();
-    $('#view').innerHTML = `<div class="empty">De kelder is niet bereikbaar: ${esc(err.message)}</div>`;
+    if (err instanceof AuthError) return lockScreen();
+    $('#view').innerHTML = `<div class="empty">The basement is unreachable: ${esc(err.message)}</div>`;
     return;
   }
   $('#hud').hidden = false;
   $('#footer').hidden = false;
   if (!started) {
     started = true;
-    // Elk achievement-chipje, waar ook, opent de uitleg.
+    // Every achievement chip, anywhere, opens its explanation.
     document.addEventListener('click', (e) => {
       if (e.target.closest('a, input, label')) return;
       const chip = e.target.closest('[data-ach]');
@@ -150,9 +166,9 @@ async function start() {
       render();
     });
     subscribe((reason) => {
-      if (reason === 'auth') return showLock('Je sessie is verlopen. Log opnieuw in.');
+      if (reason === 'auth') return lockScreen('Your session has expired. Please log in again.');
       if (reason === 'status') return renderHud();
-      if (reason === 'conflict') toast({ kicker: 'BIJGEWERKT', title: 'Er was een nieuwere stand van een ander apparaat; die staat er nu.' });
+      if (reason === 'conflict') toast({ kicker: 'UPDATED', title: 'Another device had newer progress; that is shown now.' });
       render();
     });
   }
@@ -163,9 +179,9 @@ async function start() {
 (async function boot() {
   try {
     const s = await api('/session');
-    if (!s.authed) return showLock();
+    if (!s.authed) return showLock('', s.registrationOpen === true);
     start();
   } catch (err) {
-    $('#view').innerHTML = `<div class="empty">Server niet bereikbaar: ${esc(err.message)}</div>`;
+    $('#view').innerHTML = `<div class="empty">Server unreachable: ${esc(err.message)}</div>`;
   }
 })();

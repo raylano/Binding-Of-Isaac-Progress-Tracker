@@ -6,9 +6,10 @@ import path from 'node:path';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'boipt-'));
 process.env.DATA_DIR = dir;
-process.env.ACCESS_PIN = '4242';
 process.env.TRUST_PROXY = '0';
-process.env.STEAM_ID = '76561197960287930';
+// Registration is closed by default (see registration.test.js); these tests
+// need an account, so this isolated data dir starts with it open.
+fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ version: 1, registrationOpen: true }));
 
 let server;
 let base;
@@ -64,7 +65,7 @@ test('account: cookie, en daarmee voortgang lezen en schrijven', async () => {
   assert.deepEqual(saved.achievements, [1, 2], 'onbekende ID valt weg');
   assert.deepEqual(saved.counters, { greedDonation: 5 }, 'rare sleutel valt weg');
 
-  // Oude basis: conflict in plaats van overschrijven.
+  // Stale base: conflict instead of overwrite.
   const stale = await fetch(`${base}/api/progress`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', cookie },

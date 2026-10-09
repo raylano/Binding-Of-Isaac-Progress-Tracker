@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { parseSave, decodeMark, MARK_COUNTERS, COUNTERS, SaveError } from '../web/js/save-parser.js';
 import { CHARACTERS, MARK_INDEX } from '../web/data/characters.js';
 
-// Bouwt een minimale, geldige save: header, 10 secties, achievements + counters.
+// Builds a minimal, valid save: header, 10 sections, achievements + counters.
 function fakeSave({ achievements = [], counters = {} } = {}) {
   const sizes = [1, 4, 4, 1, 1, 1, 1, 4, 4, 1];
   const counts = [642, 523, 14, 733, 7, 104, 46, 27, 2, 80];
@@ -67,13 +67,13 @@ test('geen save: nette fout', () => {
   assert.throws(() => parseSave(cut), SaveError);
 });
 
-// Optioneel: de echte save (komt nooit in de repo). ISAAC_SAVE=pad npm test
+// Optional: the real save (never goes into the repo). ISAAC_SAVE=path npm test
 const real = process.env.ISAAC_SAVE;
 test('echte save', { skip: !real || !fs.existsSync(real) }, () => {
   const s = parseSave(fs.readFileSync(real));
   assert.equal(s.achievementSlots, 641);
   assert.ok(s.achievements.length > 0);
   const isaac = s.marks[0];
-  // Uit de samenvatting van de gebruiker: Isaac heeft o.a. Mom's Heart, Satan en Hush.
+  // From the user's summary: Isaac has, among others, Mom's Heart, Satan and Hush.
   for (const mk of ['heart', 'satan', 'hush']) assert.ok(isaac[MARK_INDEX[mk]] >= 1, mk);
 });

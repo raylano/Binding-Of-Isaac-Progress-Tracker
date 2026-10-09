@@ -1,40 +1,123 @@
-# Kelderdagboek
+# BasementDiary
 
-Voortgangstracker voor **The Binding of Isaac: Repentance+**, in de stijl van het spel:
-een donkere kelder, papieren briefjes en een pixel-HUD.
+Progress tracker for **The Binding of Isaac: Repentance+**, styled after the game:
+a dark basement, paper notes and a pixel HUD.
 
-- **Al je unlocks**: 641 achievements, 34 personages, 408 completion marks (normal én hard).
-- **Echte vergrendelingen**: elke unlock weet wat ervoor nodig is. Downpour opent pas na
-  *A Secret Exit* (Hush 3x), The Beast pas na *A Strange Door* (Mother), enzovoort.
-  Bij alles wat op slot zit staat de keten van wat je eerst moet doen.
-- **Afvinken**: tik een mark aan (leeg → normal → hard). De bijbehorende unlocks gaan vanzelf mee.
-- **Route-advies**: per personage de run die nu het meeste oplevert, de "Beste volgende
-  runs" over alle personages heen, en je plek in de meta-route uit drie veelgebruikte
-  Steam-guides. Unlocks die de guides willen uitstellen (Missing No., TMTRAINER…) krijgen
-  een waarschuwing en worden in plannen overgeslagen.
-- **Sync**: je save-bestand inlezen (exact, inclusief Hard-marks en tellers zoals de
-  Greed-machine), Steam-achievements aanvullen, of automatisch na het spelen via
-  `tools/sync-save.ps1`.
-- **Eigen accounts**: iedereen registreert zich met e-mail en wachtwoord; voortgang en
-  save-uploads zijn strikt per account. Rate limits, intrekbare sessies.
+- **All your unlocks**: 641 achievements, 34 characters, 408 completion marks (normal and hard).
+- **Real dependencies**: every unlock knows what it needs. Downpour only opens after
+  *A Secret Exit* (Hush 3x), The Beast only after *A Strange Door* (Mother), and so on.
+  Anything still locked shows the chain of what you have to do first.
+- **Ticking off**: tap a mark (empty → normal → hard). The unlocks that come with it follow automatically.
+- **Route advice**: per character the run that pays off most right now, the "Best next
+  runs" across all characters, and your place in the meta route from three popular
+  Steam guides. Unlocks the guides recommend postponing (Missing No., TMTRAINER…) get a
+  warning and are skipped in plans.
+- **Unlock details**: item unlocks show their Item Quality (Q0-Q4), challenges a short tip.
+- **Sync**: import your save file (exact, including Hard marks and counters such as the
+  Greed machine), fill gaps from Steam achievements, or sync automatically after playing
+  with `tools/sync-save.ps1` on Windows.
+- **Accounts**: email and password; progress and save uploads are strictly per account.
+  Registration is closed by default and only the admin can open it. Rate limits,
+  revocable sessions.
 
-## Lokaal draaien
+## Playing Isaac with automatic sync (Windows)
+
+The script needs to know which server to sync to; there is no built-in default. The
+server's origin is configured with `PUBLIC_URL` in its `.env`, and the *Sync* page on the
+site shows the exact command with the right `-Server` for that server. Below,
+`https://your-domain.example` stands for that address.
+
+Install The Binding of Isaac: Rebirth and Repentance+ through Steam, and sign in to the
+Steam client on Windows before using the shortcut.
+
+1. Download or clone this repository and keep it in a fixed place; the shortcut runs
+   `tools/sync-save.ps1` from there.
+2. Run this once in PowerShell from the repository folder:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1 -Server https://your-domain.example -InstallShortcut
+   ```
+
+3. Log in with your email address and password. Creating a new account here (or on the
+   site) only works while the admin has registration open.
+4. The script puts an **Isaac + sync** shortcut on your desktop. From now on, always start
+   Isaac with that shortcut: it launches the game via Steam and uploads your save
+   automatically as soon as you quit. No manual upload or sync is needed after this setup.
+
+The script never stores your password. The server issues a sync token for this PC, kept encrypted
+with Windows DPAPI (readable only by your Windows account); you can revoke it on the site
+under *Sync → Account*. Run the script with `-ResetLogin` to log in again or switch
+accounts. More options: [DEPLOY.md](DEPLOY.md#8-windows-sync-your-save-automatically).
+
+## Self-hosting on Linux (quickstart)
+
+You need a Linux server with Docker and Docker Compose, a domain whose DNS points to the
+server, and an HTTPS reverse proxy (e.g. nginx with Let's Encrypt) in front of the app.
+
+```bash
+git clone https://github.com/raylano/BOIPT.git ~/BOIPT && cd ~/BOIPT
+cp .env.example .env
+chmod 600 .env
+```
+
+Edit `.env` (placeholders only; never commit real values):
+
+```
+PUBLIC_URL=https://your-domain.example
+ADMIN_EMAIL=you@example.com
+ADMIN_PASSWORD=
+PORT=8090
+TRUST_PROXY=1
+```
+
+Before the first start, set `ADMIN_PASSWORD` in this local `.env` to a unique one-time
+password of at least 12 characters. Do not commit the value; remove it after the admin
+account has been created.
+
+Start and check:
+
+```bash
+docker compose up -d --build
+curl -fsS http://127.0.0.1:8090/api/health    # {"ok":true}
+```
+
+The first start creates the admin account. Then remove the `ADMIN_PASSWORD` line from
+`.env` and recreate the container (`docker compose up -d`). Registration stays closed
+until the admin opens it under *Sync → Admin*.
+
+For the full nginx/TLS, DNS, update and backup instructions see [DEPLOY.md](DEPLOY.md).
+
+## Running locally
+
+Requires Node.js 20 or newer.
 
 ```bash
 npm install
-```
-
-```bash
 cp .env.example .env
 ```
 
-Zet in `.env` voor lokaal `TRUST_PROXY=0`, en start:
+Edit `.env` for local use:
+
+```
+PORT=8090
+PUBLIC_URL=http://localhost:8090
+TRUST_PROXY=0
+ADMIN_EMAIL=you@example.com
+ADMIN_PASSWORD=
+```
+
+For local development, set `ADMIN_PASSWORD` in `.env` to a unique password of at least
+12 characters before the first start. Keep it local and remove it after account creation.
+
+Start the server:
 
 ```bash
 npm run dev
 ```
 
-De site staat dan op http://localhost:8090. Maak daar een account.
+The site runs on http://localhost:8090. On the first start the admin account for
+`ADMIN_EMAIL` is created from `ADMIN_PASSWORD`; remove `ADMIN_PASSWORD` from `.env`
+afterwards. Log in with it; the admin can open registration under *Sync → Admin*.
 
 ## Tests
 
@@ -42,60 +125,106 @@ De site staat dan op http://localhost:8090. Maak daar een account.
 npm test
 ```
 
-Met je echte save erbij (komt nooit in de repo):
+The tests use their own temporary data directories. Tests that need sign-ups open
+registration in their own setup; `tests/registration.test.js` checks the production
+default (closed), the admin toggle and the sign-up rate limit.
+
+With your real save as well (never committed):
 
 ```bash
 ISAAC_SAVE="C:/Program Files (x86)/Steam/userdata/<id>/250900/remote/rep+persistentgamedata1.dat" npm test
 ```
 
-## Data bijwerken
+## Updating the data
 
-`web/data/achievements.json` komt uit de wiki en Steam en staat in de repo. Opnieuw
-ophalen (alleen nodig als het spel nieuwe achievements krijgt):
+`web/data/achievements.json` comes from the wiki and Steam and is part of the repo.
+Fetch it again (only needed when the game gets new achievements):
 
 ```bash
 npm run build-data
 ```
 
-## Opbouw
+`web/data/item-quality.js` (Item Quality per item unlock) is built from locally saved
+source pages, without network access:
 
-| Pad | Wat |
+```bash
+node scripts/build-quality.mjs [source-dir]           # rewrites the file
+node scripts/build-quality.mjs [source-dir] --check   # only checks
+```
+
+Only achievements that add a collectible to the pool get a tier (Q0–Q4, using the
+Repentance+ value). The generator reads saved source pages and keeps known conflicts in
+`QUALITY_CONFLICTS`; unresolved items use the documented wiki value. Trinkets, cards,
+runes, pills and pickups have no collectible Quality and are listed in `NO_QUALITY_SOURCE`.
+
+## Layout
+
+| Path | What |
 |---|---|
-| `server/` | Express: statische site, accounts en sessies, rate limits, voortgang per account, Steam-proxy, save-upload |
-| `server/accounts.js` | Accounts (`data/users.json`) en sessies (`data/sessions.json`) |
-| `server/passwords.js` | E-mail normaliseren, wachtwoordregels, scrypt-hashes |
-| `server/store.js` | Voortgang in `data/users/<id>/progress.json`, eenmalige overname van de oude PIN-voortgang |
-| `web/js/save-parser.js` | Leest `rep+persistentgamedata*.dat` (achievements, marks, tellers); draait in browser en Node |
-| `web/js/logic.js` | Afhankelijkheden: wat is binnen, beschikbaar of op slot, en waarom |
-| `web/js/advisor.js` | Run-planner en meta-route |
-| `web/data/characters.js` | Personages en marks in save-volgorde |
-| `web/data/route.js` | Meta-route en "liever uitstellen", met bronnen |
-| `tools/sync-save.ps1` | Save insturen naar je account zonder browser, ook automatisch na het spelen |
+| `server/` | Express: static site, accounts and sessions, rate limits, progress per account, Steam proxy, save upload |
+| `server/accounts.js` | Accounts (`data/users.json`) and sessions (`data/sessions.json`) |
+| `server/admin.js` | Site settings (`data/settings.json`: registration open/closed) and creating the admin account |
+| `server/passwords.js` | Email normalisation, password rules, scrypt hashes |
+| `server/store.js` | Progress in `data/users/<id>/progress.json` |
+| `web/js/save-parser.js` | Reads `rep+persistentgamedata*.dat` (achievements, marks, counters); runs in browser and Node |
+| `web/js/logic.js` | Dependencies: what is unlocked, available or locked, and why |
+| `web/js/advisor.js` | Run planner and meta route |
+| `web/data/characters.js` | Characters and marks in save order |
+| `web/data/route.js` | Meta route and "better postpone", with sources |
+| `web/data/item-quality.js` | Item Quality per item unlock (generated by `scripts/build-quality.mjs`) |
+| `web/data/challenge-tips.js` | Tip per challenge #1-#45, with wiki source |
+| `web/js/unlock-info.js` | Q badge and challenge tip for the unlock drawer |
+| `tools/sync-save.ps1` | Windows: send your save to your account without a browser, also automatically after playing |
 
-Deployen: zie [DEPLOY.md](DEPLOY.md).
+Deployment: see [DEPLOY.md](DEPLOY.md).
 
-## Accounts en beveiliging
+## Configuration
 
-| Onderwerp | Keuze |
+All settings are environment variables; see [.env.example](.env.example).
+
+| Variable | Meaning |
 |---|---|
-| Registratie | Open voor iedereen. E-mail wordt getrimd en in kleine letters gezet (punten en `+label` blijven). Geen e-mailverificatie of wachtwoordherstel per mail: de server verstuurt geen mail. |
-| Wachtwoord | 12 tot 128 tekens, niet één herhaald teken, niet gelijk aan het e-mailadres. Opgeslagen als scrypt (N=32768, r=8, p=1, 16 bytes salt, 64 bytes hash); de parameters staan in de hash zodat ze later omhoog kunnen. |
-| Dubbel account | `409`. Dat verraadt dat een adres bestaat; bewuste afweging voor een duidelijke melding, beperkt door 10 registraties per uur per IP. Inloggen geeft voor onbekend adres en fout wachtwoord wél exact hetzelfde antwoord, en rekent in beide gevallen een hash uit. |
-| Sessies | 32 willekeurige bytes in een `HttpOnly; SameSite=Strict; Path=/`-cookie (`Secure` achter HTTPS), 30 dagen geldig. Op schijf alleen de SHA-256. Bij elke login een nieuw token. Uitloggen en intrekken werken direct. Max. 50 sessies per account. |
-| Sync-script | Krijgt via `POST /api/token` een apart token (een jaar geldig) dat alleen als `Authorization: Bearer` werkt; een browsercookie werkt niet als bearer en andersom. Het wachtwoord wordt nooit bewaard. |
-| CSRF | `SameSite=Strict`, plus: wijzigende verzoeken met een `Origin` van een andere host of `Sec-Fetch-Site: cross-site` krijgen `403`. |
-| Rate limits | Inloggen/token: 5 fouten en 30 pogingen in totaal (scrypt is duur) per IP per 15 min. Bewust geen harde grens per account: daarmee kan een vreemde de eigenaar buitensluiten; tegen raden over veel IPs heen helpt de wachtwoordeis van 12+ tekens. Oude PIN: 5 fouten per IP per 15 min en 20 in totaal per uur. Registreren: 10 per IP per uur. Onbekende bearer-tokens: 20 per IP per 15 min. Tellers staan in het geheugen en beginnen na een herstart opnieuw. |
-| Oude PIN | Een korte PIN is met veel accounts en IPs over dagen te raden, en de totale grens kan het overnemen een uur blokkeren. Neem de oude voortgang dus meteen na de update over en haal daarna `ACCESS_PIN` uit `.env`. |
-| Isolatie | Voortgang staat in `data/users/<id>/progress.json`; het ID is 32 hex-tekens van de server zelf en wordt gecontroleerd voordat er een pad van wordt gemaakt. Steam-sync gebruikt alleen de SteamID die bij het account is opgeslagen. |
-| Oude PIN-voortgang | Wordt aan niemand getoond. Overnemen kan één keer, met de juiste `ACCESS_PIN`, in een account zonder eigen voortgang. `data/legacy-claim.json` wordt exclusief aangemaakt, dus van gelijktijdige pogingen wint er één. |
-| Gelijktijdigheid | Lezen-aanpassen-schrijven per account loopt via een slot; bestanden worden atomisch geschreven (`0600`, map `0700`). Eén serverproces per datamap: accounts en sessies staan in het geheugen. |
-| Niet gedaan | Account verwijderen, wachtwoord wijzigen/vergeten, 2FA, e-mailverificatie. Wachtwoord vergeten = beheerder past `data/users.json` aan. Ingelogde accounts zien wél óf er nog oude voortgang over te nemen is (niet wat erin staat). |
+| `PORT` | Port (Docker: host port on 127.0.0.1; the container always listens on 8080). |
+| `PUBLIC_URL` | Public origin, e.g. `https://your-domain.example`. Used in the sync-script command on the Sync page. HTTPS only (HTTP is allowed for localhost). Empty means the page uses its own address. |
+| `ADMIN_EMAIL` | The account with this address is the admin and can open or close registration. This address can never be taken via sign-up. |
+| `ADMIN_PASSWORD` | One-time: creates the admin account on startup if it does not exist yet. Hashed, removed from the process environment, never logged; ignored once the account exists. Remove it after the first start. |
+| `STEAM_API_KEY` | Optional Steam Web API key. Without it the public profile page is used. |
+| `TRUST_PROXY` | Number of proxies in front of the app (`1` behind nginx, `0` locally). |
 
-## Bronnen
+`ACCESS_PIN`, `STEAM_ID` and `SESSION_SECRET` are no longer used; the server warns if
+they are still set.
 
-- Unlock-eisen: [Binding of Isaac: Rebirth Wiki](https://bindingofisaacrebirth.wiki.gg/wiki/Achievements) (CC BY-SA 3.0), via de Cargo-export.
-- Save-indeling: [REPENTOGON EventCounter](https://repentogon.com/enums/EventCounter.html), nagerekend met de offsets uit [isaac-save-edit-script](https://github.com/jamesthejellyfish/isaac-save-edit-script) (MIT).
-- Route-advies: [Most & Least Important Unlocks](https://steamcommunity.com/sharedfiles/filedetails/?id=2994836310), [Dead God Roadmap](https://steamcommunity.com/sharedfiles/filedetails/?id=2980920774), [Dead God / Infinity route](https://steamcommunity.com/sharedfiles/filedetails/?id=3712501774).
-- Lettertypen (OFL): Rock Salt, Gochi Hand, Patrick Hand, Pixelify Sans.
+## Accounts and security
 
-Fanproject, niet verbonden aan Nicalis of Edmund McMillen.
+| Topic | Choice |
+|---|---|
+| Registration | Closed by default (also when `data/settings.json` is missing or unreadable). Only the admin opens or closes it, on the Sync page; the setting is stored in `data/settings.json`. While closed, `POST /api/register` returns `403` before anything else is checked, and the sign-up tab is hidden. Existing accounts can always log in. |
+| Admin | The account for `ADMIN_EMAIL`, created once from `ADMIN_PASSWORD`. Admin actions require a browser session; a sync token cannot change settings. |
+| Email | Trimmed and lowercased (dots and `+label` stay). No email verification or password reset by mail: the server sends no mail. |
+| Password | 12 to 128 characters, not one repeated character, not equal to the email address. Stored as scrypt (N=32768, r=8, p=1, 16-byte salt, 64-byte hash); the parameters are part of the hash so they can be raised later. |
+| Duplicate account | `409`. That reveals that an address exists; a deliberate trade-off for a clear message, limited by the sign-up rate limit. Login gives exactly the same answer for an unknown address and a wrong password, and computes a hash in both cases. |
+| Sessions | 32 random bytes in an `HttpOnly; SameSite=Strict; Path=/` cookie (`Secure` behind HTTPS), valid for 30 days. Only the SHA-256 is stored on disk. A new token at every login. Logout and revoking take effect immediately. At most 50 sessions per account. |
+| Sync script | Gets a separate token via `POST /api/token` (valid for a year), sent as `Authorization: Bearer <sync-token>`. A browser cookie is not a bearer token, and vice versa. The password is never stored. |
+| CSRF | `SameSite=Strict`, plus: changing requests with an `Origin` of another host or `Sec-Fetch-Site: cross-site` get `403`. |
+| Rate limits | Login/token: 5 failures and 30 attempts in total (scrypt is expensive) per IP per 15 min. Deliberately no hard limit per account: that would let a stranger lock the owner out; the 12+ character rule protects against guessing across many IPs. Sign-up: 10 attempts per IP per hour, counted whether registration is open or closed. Unknown bearer tokens: 20 per IP per 15 min. Counters live in memory and reset on restart. |
+| Isolation | Progress lives in `data/users/<id>/progress.json`; the ID is 32 hex characters generated by the server and checked before it becomes a path. Steam sync only uses the SteamID stored with the account. |
+| Concurrency | Read-modify-write per account goes through a lock; files are written atomically (`0600`, directory `0700`). One server process per data directory: accounts and sessions are kept in memory. |
+| Not included | Deleting accounts, changing/forgetting passwords, 2FA, email verification. Forgotten password = the server operator edits `data/users.json`. |
+
+## License
+
+Original BasementDiary application code is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE).
+It allows use, modification, and redistribution for noncommercial purposes; commercial use
+requires separate permission. The license does not cover third-party software, data/content,
+fonts, game assets, or trademarks; those remain under their own terms and attributions below.
+
+## Sources
+
+- Unlock requirements: [Binding of Isaac: Rebirth Wiki](https://bindingofisaacrebirth.wiki.gg/wiki/Achievements) (CC BY-SA 3.0), via the Cargo export.
+- Save format: [REPENTOGON EventCounter](https://repentogon.com/enums/EventCounter.html), cross-checked with the offsets from [isaac-save-edit-script](https://github.com/jamesthejellyfish/isaac-save-edit-script) (MIT).
+- Route advice: [Most & Least Important Unlocks](https://steamcommunity.com/sharedfiles/filedetails/?id=2994836310), [Dead God Roadmap](https://steamcommunity.com/sharedfiles/filedetails/?id=2980920774), [Dead God / Infinity route](https://steamcommunity.com/sharedfiles/filedetails/?id=3712501774).
+- Item Quality: [Items](https://bindingofisaacrebirth.wiki.gg/wiki/Items) and [Item Quality](https://bindingofisaacrebirth.wiki.gg/wiki/Item_Quality) on the Rebirth Wiki (CC BY-SA 3.0), checked against [Platinum God](https://www.tboi.com/all-items). The Q0-Q4 label follows the `{{Quality0}}`-`{{Quality4}}` glyphs of [External Item Descriptions](https://github.com/wofsauge/External-Item-Descriptions) (frames 0-4 of the `Quality` animation in [`eid_inline_icons.anm2`](https://github.com/wofsauge/External-Item-Descriptions/blob/master/resources/gfx/eid_inline_icons.anm2)/`eid_inline_icons.png`). The badge colours are the dominant filled RGB colour per frame, sampled from that sprite (crop x=44/55/66/77/88, y=32, 10x10): Q0 `#C2C2C2`, Q1 `#90FF51`, Q2 `#65D5FF`, Q3 `#FF54EC`, Q4 `#FFD100`, with dark ink as text and border colour for contrast.
+- Challenge tips: summarised from the challenge pages of the Rebirth Wiki (CC BY-SA 3.0); each tip links to its own page.
+- Fonts (OFL): Rock Salt, Gochi Hand, Patrick Hand, Pixelify Sans.
+
+BasementDiary is a fan project, not affiliated with Nicalis or Edmund McMillen.

@@ -1,36 +1,44 @@
 <#
-  Stuurt je Isaac-save naar het Kelderdagboek, zonder browser, naar jouw account.
+  Sends your Isaac save to your BasementDiary account, without a browser.
 
-  Voorbeelden:
-    powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1
-    powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1 -AfterGame
-    powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1 -InstallShortcut
+  Examples:
+    powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1 -Server https://your-domain.example
+    powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1 -Server https://your-domain.example -AfterGame
+    powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1 -Server https://your-domain.example -InstallShortcut
 
-  -AfterGame        start Isaac via Steam, wacht tot je het spel afsluit en synchroniseert dan
-  -InstallShortcut  zet een snelkoppeling "Isaac + sync" op je bureaublad die precies dat doet
-  -Slot 2           een andere save-slot (1, 2 of 3)
-  -ResetLogin       opnieuw inloggen (of een ander account kiezen)
+  -Server URL       your BasementDiary server (required; or set BOIPT_SERVER instead).
+                    The Sync page on the site shows this command with the right -Server.
+  -AfterGame        start Isaac via Steam, wait until you quit the game, then sync
+  -InstallShortcut  put an "Isaac + sync" shortcut on your desktop that does exactly that
+  -Slot 2           use a different save slot (1, 2 or 3)
+  -ResetLogin       log in again (or pick a different account)
 
-  De eerste keer log je in met je e-mailadres en wachtwoord, of maak je een nieuw
-  account. Het wachtwoord wordt niet bewaard: de server geeft een eigen sync-token
-  voor deze pc, en dat staat versleuteld met Windows DPAPI (alleen leesbaar voor
-  jouw Windows-account) in %APPDATA%\boipt\account-<server>.xml. Intrekken kan op
-  de site onder Sync -> Account.
+  The first time, you log in with your email address and password, or create a new
+  account (only while the admin has registration open). The password is not stored:
+  the server issues a dedicated sync token for this PC, which is kept encrypted with
+  Windows DPAPI (readable only by your Windows account) in
+  %APPDATA%\boipt\account-<server>.xml. You can revoke it on the site under
+  Sync -> Account.
 #>
 param(
-  [string]$Server = $(if ($env:BOIPT_SERVER) { $env:BOIPT_SERVER } else { 'https://isaac.wolfs.dev' }),
+  [string]$Server = $env:BOIPT_SERVER,
   [ValidateSet(1, 2, 3)][int]$Slot = 1,
   [string]$SavePath,
   [switch]$AfterGame,
   [switch]$InstallShortcut,
-  [Alias('ResetPin')][switch]$ResetLogin
+  [switch]$ResetLogin
 )
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+if ([string]::IsNullOrWhiteSpace($Server)) {
+  throw ("No server set. Pass -Server https://your-server or set the BOIPT_SERVER environment variable. " +
+    "If you host BasementDiary yourself, the Sync page on your site shows the exact command with the " +
+    "right -Server, based on PUBLIC_URL in the server's .env.")
+}
 $Server = $Server.TrimEnd('/')
 if ($Server -notmatch '^https://' -and $Server -notmatch '^http://(localhost|127\.0\.0\.1)(:\d+)?$') {
-  throw "Gebruik https voor $Server; je wachtwoord en token gaan anders onversleuteld over het net."
+  throw "Use https for $Server; otherwise your password and token travel over the network unencrypted."
 }
 
 $Dir = Join-Path $env:APPDATA 'boipt'
@@ -42,7 +50,7 @@ function Get-Plain([Security.SecureString]$secure) {
   finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
 }
 
-# POST met JSON; geeft @{ Status; Body } terug, ook bij 4xx.
+# POST as JSON; returns @{ Status; Body }, also on 4xx.
 function Invoke-Json([string]$Path, $Data) {
   $bytes = [Text.Encoding]::UTF8.GetBytes(($Data | ConvertTo-Json -Compress))
   try {
@@ -58,33 +66,33 @@ function Invoke-Json([string]$Path, $Data) {
 }
 
 function New-Login {
-  Write-Host "Inloggen bij $Server" -ForegroundColor Cyan
-  $answer = Read-Host 'Heb je al een account? (j/n)'
+  Write-Host "Log in to $Server" -ForegroundColor Cyan
+  $answer = Read-Host 'Do you already have an account? (y/n)'
   $isNew = $answer -match '^[nN]'
-  $email = (Read-Host 'E-mailadres').Trim()
-  $password = Get-Plain (Read-Host -AsSecureString 'Wachtwoord (minstens 12 tekens)')
+  $email = (Read-Host 'Email address').Trim()
+  $password = Get-Plain (Read-Host -AsSecureString 'Password (at least 12 characters)')
   try {
     if ($isNew) {
-      $again = Get-Plain (Read-Host -AsSecureString 'Nog een keer')
-      if ($again -ne $password) { throw 'De wachtwoorden zijn niet gelijk.' }
+      $again = Get-Plain (Read-Host -AsSecureString 'Repeat password')
+      if ($again -ne $password) { throw 'The passwords do not match.' }
       $again = $null
       $reg = Invoke-Json 'register' @{ email = $email; password = $password }
-      if ($reg.Status -ne 200) { throw "Account maken mislukt: $($reg.Body.error)" }
-      Write-Host 'Account gemaakt.' -ForegroundColor Green
+      if ($reg.Status -ne 200) { throw "Could not create account: $($reg.Body.error)" }
+      Write-Host 'Account created.' -ForegroundColor Green
     }
     $res = Invoke-Json 'token' @{ email = $email; password = $password; label = $env:COMPUTERNAME }
   } finally {
     $password = $null
   }
-  if ($res.Status -eq 429) { throw 'Te veel pogingen; wacht een kwartier.' }
-  if ($res.Status -ne 200) { throw "Inloggen mislukt: $($res.Body.error)" }
+  if ($res.Status -eq 429) { throw 'Too many attempts; wait fifteen minutes.' }
+  if ($res.Status -ne 200) { throw "Login failed: $($res.Body.error)" }
   New-Item -ItemType Directory -Force -Path $Dir | Out-Null
-  # Export-Clixml versleutelt het wachtwoordveld (hier: het token) met DPAPI.
+  # Export-Clixml encrypts the password field (here: the token) with DPAPI.
   $secureToken = ConvertTo-SecureString $res.Body.token -AsPlainText -Force
   New-Object Management.Automation.PSCredential ($email, $secureToken) | Export-Clixml -Path $CredFile
-  # De oude PIN van voor de accounts is niet meer nodig.
+  # The old PIN from before accounts existed is no longer needed.
   Remove-Item (Join-Path $Dir 'pin.txt') -Force -ErrorAction SilentlyContinue
-  Write-Host "Ingelogd als $email; deze pc synct voortaan naar dat account." -ForegroundColor Green
+  Write-Host "Logged in as $email; this PC will now sync to that account." -ForegroundColor Green
 }
 
 function Get-Token {
@@ -112,10 +120,10 @@ function Find-Save {
         ForEach-Object { Get-Item $_ }
     }
   }
-  # Zonder Steam Cloud staat de save in Documenten.
+  # Without Steam Cloud the save lives in Documents.
   $local = Join-Path ([Environment]::GetFolderPath('MyDocuments')) "My Games\Binding of Isaac Repentance+\$name"
   if (Test-Path $local) { $candidates += Get-Item $local }
-  if (-not $candidates) { throw "Geen $name gevonden. Geef het pad op met -SavePath." }
+  if (-not $candidates) { throw "No $name found. Pass the path with -SavePath." }
   return ($candidates | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
 }
 
@@ -130,16 +138,16 @@ function Send-Save([switch]$Retried) {
   } catch {
     $code = $_.Exception.Response.StatusCode.value__
     if ($code -eq 401 -and -not $Retried -and -not $env:BOIPT_TOKEN) {
-      Write-Host 'Je sync-token is verlopen of ingetrokken. Log opnieuw in.' -ForegroundColor Yellow
+      Write-Host 'Your sync token has expired or been revoked. Please log in again.' -ForegroundColor Yellow
       Remove-Item $CredFile -Force -ErrorAction SilentlyContinue
       return Send-Save -Retried
     }
-    if ($code -eq 401) { Write-Host 'Niet ingelogd. Probeer opnieuw met -ResetLogin.' -ForegroundColor Red; exit 1 }
-    if ($code -eq 429) { Write-Host 'Te veel pogingen; wacht even.' -ForegroundColor Red; exit 1 }
+    if ($code -eq 401) { Write-Host 'Not logged in. Try again with -ResetLogin.' -ForegroundColor Red; exit 1 }
+    if ($code -eq 429) { Write-Host 'Too many attempts; please wait a moment.' -ForegroundColor Red; exit 1 }
     throw
   }
   $new = @($res.gained).Count
-  Write-Host ("Gelukt: {0}, {1} geheimen, {2} nieuw." -f $res.edition, $res.achievements, $new) -ForegroundColor Green
+  Write-Host ("Done: {0}, {1} secrets, {2} new." -f $res.edition, $res.achievements, $new) -ForegroundColor Green
 }
 
 if ($InstallShortcut) {
@@ -154,26 +162,26 @@ if ($InstallShortcut) {
   if ($steamExe) { $sc.IconLocation = $steamExe }
   $sc.Save()
   Get-Token | Out-Null
-  Write-Host "Snelkoppeling gemaakt: $lnk" -ForegroundColor Green
+  Write-Host "Shortcut created: $lnk" -ForegroundColor Green
   exit 0
 }
 
 if ($AfterGame) {
-  # Eerst inloggen, zodat er na het spelen niets meer gevraagd hoeft te worden.
+  # Log in first, so nothing needs to be asked after playing.
   Get-Token | Out-Null
   $running = Get-Process -Name 'isaac-ng' -ErrorAction SilentlyContinue
   if (-not $running) {
-    Write-Host 'Isaac starten via Steam...'
+    Write-Host 'Starting Isaac via Steam...'
     Start-Process 'steam://rungameid/250900'
     $deadline = (Get-Date).AddMinutes(3)
     while (-not ($running = Get-Process -Name 'isaac-ng' -ErrorAction SilentlyContinue)) {
-      if ((Get-Date) -gt $deadline) { throw 'Isaac is niet gestart binnen 3 minuten.' }
+      if ((Get-Date) -gt $deadline) { throw 'Isaac did not start within 3 minutes.' }
       Start-Sleep -Seconds 2
     }
   }
-  Write-Host 'Veel plezier in de kelder. Ik synchroniseer zodra je het spel afsluit.'
+  Write-Host 'Have fun in the basement. Syncing as soon as you quit the game.'
   $running | Wait-Process
-  # Het spel schrijft de save bij het afsluiten; even wachten tot Steam Cloud klaar is.
+  # The game writes the save on exit; give Steam Cloud a moment to finish.
   Start-Sleep -Seconds 5
 }
 

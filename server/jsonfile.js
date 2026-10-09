@@ -1,5 +1,5 @@
-// JSON-bestanden atomisch schrijven (tijdelijk bestand, dan hernoemen), één
-// schrijfactie tegelijk per bestand, en alleen leesbaar voor de eigenaar.
+// Write JSON files atomically (temporary file, then rename), one write at a
+// time per file, and readable only by the owner.
 
 import fs from 'node:fs/promises';
 import fss from 'node:fs';
@@ -26,7 +26,7 @@ export async function readJson(file) {
   }
 }
 
-// De inhoud wordt meteen vastgelegd; de schrijfacties lopen in volgorde.
+// The content is captured immediately; the writes run in order.
 export function writeJson(file, data) {
   const text = JSON.stringify(data);
   const prev = queues.get(file) || Promise.resolve();
@@ -46,8 +46,8 @@ export function writeJson(file, data) {
   return next;
 }
 
-// Eenvoudige mutex per sleutel: lezen-vergelijken-schrijven zonder dat een
-// tweede verzoek ertussen komt.
+// Simple mutex per key: read-compare-write without a second request getting
+// in between.
 const locks = new Map();
 export function withLock(key, fn) {
   const prev = locks.get(key) || Promise.resolve();

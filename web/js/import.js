@@ -1,7 +1,7 @@
-// Save-bestand inlezen, zo makkelijk mogelijk:
-//  - Chrome/Edge: de eerste keer kies je het bestand, daarna onthoudt de browser
-//    het (handle in IndexedDB) en is "Sync save" één klik.
-//  - Elders, of als de browser de map niet wil openen: gewoon bestand kiezen of slepen.
+// Read the save file, as easily as possible:
+//  - Chrome/Edge: the first time you pick the file, after that the browser
+//    remembers it (handle in IndexedDB) and "Sync save" is a single click.
+//  - Elsewhere, or if the browser refuses to open the folder: just pick or drag the file.
 
 const DB = 'boipt';
 const STORE = 'handles';
@@ -40,7 +40,7 @@ async function idbSet(key, value) {
       tx.onerror = resolve;
     });
   } catch {
-    /* geen opslag: dan maar elke keer kiezen */
+    /* no storage: just pick it every time then */
   }
 }
 
@@ -55,13 +55,13 @@ export async function forgetHandle() {
   await idbSet(KEY, null);
 }
 
-// Moet vanuit een klik worden aangeroepen (toestemming vragen mag alleen dan).
+// Must be called from a click (asking for permission is only allowed then).
 export async function readStored() {
   const handle = await storedHandle();
   if (!handle) return null;
   let perm = await handle.queryPermission?.({ mode: 'read' });
   if (perm !== 'granted') perm = await handle.requestPermission?.({ mode: 'read' });
-  if (perm !== 'granted') throw new Error('Geen toestemming om het bestand te lezen.');
+  if (perm !== 'granted') throw new Error('No permission to read the file.');
   const file = await handle.getFile();
   return { name: file.name, modified: file.lastModified, bytes: new Uint8Array(await file.arrayBuffer()) };
 }
@@ -71,7 +71,7 @@ export async function pickAndRemember() {
     id: 'isaac-save',
     startIn: 'documents',
     multiple: false,
-    types: [{ description: 'Isaac-save', accept: { 'application/octet-stream': ['.dat'] } }],
+    types: [{ description: 'Isaac save', accept: { 'application/octet-stream': ['.dat'] } }],
   });
   await idbSet(KEY, handle);
   const file = await handle.getFile();

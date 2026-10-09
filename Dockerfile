@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 FROM node:22-alpine
 
-# su-exec laat de entrypoint zijn root-rechten vallen na het goedzetten van /data.
+# su-exec lets the entrypoint drop its root privileges after fixing up /data.
 RUN apk add --no-cache su-exec
 
 WORKDIR /app
@@ -23,7 +23,7 @@ ENV NODE_ENV=production \
 EXPOSE 8080
 VOLUME ["/data"]
 
-# Geen curl in de image nodig: Node heeft zelf fetch.
+# No curl needed in the image: Node has fetch built in.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:8080/api/health').then(r=>{process.exitCode=r.ok?0:1}).catch(()=>{process.exitCode=1})"
 

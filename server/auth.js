@@ -1,10 +1,8 @@
-// Inloggen met e-mail en wachtwoord. De browser krijgt een HttpOnly-cookie met
-// een willekeurig sessietoken; het sync-script krijgt een apart token dat het
-// als "Authorization: Bearer <token>" meestuurt. Beide staan (gehasht) in
-// sessions.json, zodat uitloggen en intrekken direct werken.
+// Login with email and password. The browser gets an HttpOnly cookie with a
+// random session token; the sync script gets a separate token that it sends as
+// "Authorization: Bearer <token>". Both are stored (hashed) in sessions.json,
+// so logging out and revoking take effect immediately.
 
-import crypto from 'node:crypto';
-import { config } from './config.js';
 import { resolveSession, SESSION_TTL } from './accounts.js';
 
 export const COOKIE = 'boipt_session';
@@ -40,7 +38,7 @@ export function clearSessionCookie(req, res) {
   res.setHeader('Set-Cookie', `${COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${req.secure ? '; Secure' : ''}`);
 }
 
-// { user, session, via } of null.
+// { user, session, via } or null.
 export function authenticate(req) {
   const auth = req.headers.authorization;
   if (auth !== undefined) {
@@ -54,31 +52,22 @@ export function authenticate(req) {
 
 export function requireAuth(req, res, next) {
   const found = authenticate(req);
-  if (!found) return res.status(401).json({ error: 'Deze deur is op slot. Log in.' });
+  if (!found) return res.status(401).json({ error: 'This door is locked. Please log in.' });
   req.user = found.user;
   req.session = found.session;
   next();
 }
 
-// Extra laag naast SameSite=Strict: een wijzigend verzoek met een Origin van een
-// andere site wordt geweigerd. Scripts zonder Origin (sync) gaan gewoon door.
+// Extra layer on top of SameSite=Strict: a state-changing request with an
+// Origin from another site is rejected. Scripts without an Origin (sync) pass.
 export function sameOrigin(req, res, next) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
-  if (req.headers['sec-fetch-site'] === 'cross-site') return res.status(403).json({ error: 'Verzoek van een andere site geweigerd.' });
+  if (req.headers['sec-fetch-site'] === 'cross-site') return res.status(403).json({ error: 'Request from another site refused.' });
   const origin = req.headers.origin;
   if (origin) {
     let host = null;
-    try { host = new URL(origin).host; } catch { /* ongeldig = weigeren */ }
-    if (host !== req.headers.host) return res.status(403).json({ error: 'Verzoek van een andere site geweigerd.' });
+    try { host = new URL(origin).host; } catch { /* invalid = reject */ }
+    if (host !== req.headers.host) return res.status(403).json({ error: 'Request from another site refused.' });
   }
   next();
-}
-
-// De oude ACCESS_PIN dient alleen nog als bewijs bij het overnemen van de oude
-// voortgang. Gelijke lengte via een hash, dan constant-time vergelijken.
-export function pinMatches(pin) {
-  if (!config.pin || typeof pin !== 'string') return false;
-  const a = crypto.createHash('sha256').update(pin).digest();
-  const b = crypto.createHash('sha256').update(config.pin).digest();
-  return crypto.timingSafeEqual(a, b);
 }

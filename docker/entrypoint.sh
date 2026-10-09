@@ -1,5 +1,5 @@
 #!/bin/sh
 set -e
-# De datamap is een bind-mount van de host; zorg dat de app erin mag schrijven.
+# The data directory is a bind mount from the host; make sure the app may write to it.
 chown -R node:node /data
 exec su-exec node "$@"

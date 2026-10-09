@@ -1,93 +1,108 @@
-# Draaiboek voor de server
+# Deployment
 
-De service heet `boipt`, de container ook. Hij draait op poort **8090**, alleen op
-localhost; nginx zet hem online op **isaac.wolfs.dev** met HTTPS.
+BasementDiary runs in one Docker container (`boipt`) on a Linux server. The container
+listens on port 8080; Docker publishes it only on **127.0.0.1:8090**, with nginx serving
+HTTPS in front. `https://your-domain.example` below is a placeholder: set your real origin
+with `PUBLIC_URL` in `.env`; the Sync page then shows players the right `-Server` command.
 
-Bijwerken gaat net als bij WolfsPiano: `git pull` en opnieuw bouwen.
+Requirements: Linux, Docker with the Compose plugin, nginx, certbot, a domain, and git.
 
 ---
 
-## 1. Eenmalig: DNS
+## 1. DNS (once)
 
-Maak bij je domeinbeheer een **A-record** aan:
+Create an A record for the host you want players to use (replace the DNS provider's Name/Host
+field with the appropriate subdomain or `@`):
 
-| Naam | Type | Waarde |
+| Name / Host | Type | Value |
 |---|---|---|
-| `isaac` | A | het IP-adres van je VPS |
+| your chosen hostname | A | the server's public IPv4 address |
 
-Controleer na een paar minuten met `ping isaac.wolfs.dev` of hij naar je server wijst.
+Add an AAAA record only if the server is reachable over IPv6. After DNS has propagated,
+verify the chosen hostname resolves with `getent ahosts your-domain.example`.
 
 ---
 
-## 2. Eenmalig op de server: repo en instellingen
-
-Docker heb je al van WolfsPiano. Repo ophalen:
+## 2. Repository and settings (once)
 
 ```bash
 git clone https://github.com/raylano/BOIPT.git ~/BOIPT && cd ~/BOIPT
 ```
 
-> **Privé-repo?** Gebruik dezelfde deploy key als bij WolfsPiano (GitHub → repo →
-> *Settings → Deploy keys*) en kloon met `git@github.com:raylano/BOIPT.git`.
+> **Private repo?** Add a deploy key (GitHub → repo → *Settings → Deploy keys*) and
+> clone with `git@github.com:raylano/BOIPT.git`.
 
-Instellingen:
-
-```bash
-cp .env.example .env
-```
+Create `.env` from the template and restrict it to your user:
 
 ```bash
+cp .env.example .env && chmod 600 .env
 nano .env
 ```
 
-Iedereen maakt op de site zelf een account (e-mail + wachtwoord); er hoeft dus niets
-verplicht in `.env`. Alleen als er nog voortgang van vóór de accounts in
-`data/progress.json` staat, laat je daar de oude PIN staan:
+Set at least:
 
 ```
-ACCESS_PIN=<je oude PIN>
+PORT=8090
+PUBLIC_URL=https://your-domain.example
+ADMIN_EMAIL=you@example.com
+ADMIN_PASSWORD=
+TRUST_PROXY=1
 ```
 
-Daarmee kan de eigenaar die voortgang één keer naar zijn account halen (zie
-*8. Van PIN naar accounts*). `SESSION_SECRET` wordt niet meer gebruikt.
+Set `ADMIN_EMAIL` to an address you control. Before the first start, put a unique password
+of at least 12 characters in `ADMIN_PASSWORD`. This is a one-time bootstrap secret: never
+commit it, and remove it from `.env` after the admin account is created.
+
+`PORT` controls the host port bound to loopback. `STEAM_API_KEY` is optional. Compose passes
+`PUBLIC_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `STEAM_API_KEY`, and `TRUST_PROXY` into the
+container; nothing else from `.env` reaches it. Never commit `.env`.
 
 ---
 
-## 3. Eerste start
+## 3. First start and admin account
 
 ```bash
 docker compose up -d --build
 ```
 
-Controleren:
+Check that it runs and created the admin account:
 
 ```bash
 docker compose ps
+curl -fsS http://127.0.0.1:8090/api/health
+docker compose logs --tail 20
 ```
+
+On a fresh data directory, the log should show `Admin account created for ADMIN_EMAIL.`
+
+Now remove the one-time password: empty `ADMIN_PASSWORD=` in `.env`, then recreate the
+container so the value is gone from its environment as well:
 
 ```bash
-curl -s http://127.0.0.1:8090/api/health
+nano .env
+docker compose up -d
 ```
 
-Daar hoort `{"ok":true}` uit te komen.
+If the log says the password was rejected (too short, one repeated character, or equal
+to the email address), fix `ADMIN_PASSWORD` and run `docker compose up -d` again.
 
 ---
 
-## 4. nginx en HTTPS
+## 4. nginx and HTTPS
 
-Maak `/etc/nginx/sites-available/isaac.wolfs.dev`:
+Create `/etc/nginx/sites-available/your-domain.example`:
 
 ```nginx
-# Tweede laag rate limiting, naast die in de app zelf.
+# Second layer of rate limiting, on top of the limits in the app itself.
 limit_req_zone $binary_remote_addr zone=boipt:10m rate=10r/s;
 
 server {
     listen 80;
-    server_name isaac.wolfs.dev;
+    server_name your-domain.example;
 
     client_max_body_size 1m;
 
-    location ~ ^/api/(login|register|token|legacy/claim)$ {
+    location ~ ^/api/(login|register|token)$ {
         limit_req zone=boipt burst=5 nodelay;
         proxy_pass http://127.0.0.1:8090;
         include /etc/nginx/proxy_params;
@@ -103,101 +118,130 @@ server {
 }
 ```
 
-Aanzetten en testen:
+`proxy_params` passes `Host` and `X-Forwarded-For`; the app needs both (same-origin
+check and per-IP rate limits, with `TRUST_PROXY=1`). Enable and test:
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/isaac.wolfs.dev /etc/nginx/sites-enabled/
-```
-
-```bash
+sudo ln -s /etc/nginx/sites-available/your-domain.example /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-HTTPS via Let's Encrypt (zelfde als Wolfs.dev):
+HTTPS via Let's Encrypt:
 
 ```bash
-sudo certbot --nginx -d isaac.wolfs.dev
+sudo certbot --nginx -d your-domain.example
 ```
 
-Open daarna **https://isaac.wolfs.dev**, maak een account en lees je save in via *Sync*.
+Open **https://your-domain.example** and log in with the admin account.
 
 ---
 
-## 5. Bijwerken
+## 5. Registration
 
-Op je pc: committen en pushen. Op de server:
-
-```bash
-cd ~/BOIPT && git pull && docker compose up -d --build
-```
-
-Accounts, sessies en voortgang staan in `data/` en blijven gewoon staan.
+Registration is **closed** by default: only existing accounts can log in and the sign-up
+tab is hidden. As the admin, go to *Sync → Admin* and click **Open registration** to let
+people create accounts; click **Close registration** when they are done. The setting is
+stored in `data/settings.json` and survives restarts and rebuilds. Sign-ups are limited
+to 10 attempts per IP per hour, also while registration is closed.
 
 ---
 
-## 6. Back-up
+## 6. Updating
 
-De hele datamap (accounts, sessies, voortgang per account):
+On your PC: commit and push. On the server:
 
 ```bash
+cd ~/BOIPT && git pull --ff-only && docker compose up -d --build
+```
+
+Accounts, sessions, settings and progress live in `data/` and stay in place.
+
+---
+
+## 7. Backup
+
+The whole data directory (accounts, sessions, settings, progress per account):
+
+```bash
+umask 077
 tar czf ~/boipt-backup-$(date +%F).tgz -C ~/BOIPT data
 ```
 
-Bewaar die back-up net zo zorgvuldig als de server: er staan wachtwoord-hashes in.
-
-In de site zelf kan het ook: *Sync → Download back-up*.
+Keep that backup as safe as the server: it contains password hashes. Players can also
+download their own progress on the site: *Sync → Download backup*.
 
 ---
 
-## 7. Save automatisch insturen vanaf je pc
+## 8. Windows: sync your save automatically
 
-Eenmalig een snelkoppeling maken. De eerste keer log je in (of maak je een account);
-het script bewaart geen wachtwoord, alleen een eigen sync-token voor deze pc,
-versleuteld met Windows DPAPI in `%APPDATA%\boipt\account-<server>.xml`:
+`tools/sync-save.ps1` sends your save to your account without a browser. It runs in
+Windows PowerShell 5.1 (built into Windows 10/11); its prompts are in English.
+
+1. Get the script on your PC: clone the repository, or download `tools/sync-save.ps1`
+   from it into a folder that will stay put (the shortcut points to that location).
+2. Open PowerShell in the folder that contains `tools\` and run, with your own address
+   (the Sync page on the site shows this exact command, with the right `-Server`):
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1 -Server https://your-domain.example -InstallShortcut
+   ```
+
+3. The script asks whether you already have an account (`y` = yes, `n` = no), then your
+   email address and password. Creating an account from the script only works while
+   registration is open. Your password is not stored: the server issues a sync token for
+   this PC, saved encrypted with Windows DPAPI in
+   `%APPDATA%\boipt\account-<server>.xml`.
+4. From now on start Isaac with the **Isaac + sync** desktop shortcut. It launches the
+   game through Steam, waits until you close it, and then uploads the newest
+   `rep+persistentgamedata<slot>.dat` (Steam userdata, or *Documents\My Games* without
+   Steam Cloud).
+
+Manual sync and options:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1 -InstallShortcut
+powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1 -Server https://your-domain.example
 ```
 
-Start Isaac voortaan met **Isaac + sync** op je bureaublad: zodra je het spel afsluit,
-staat je nieuwe stand online in jouw account. Handmatig kan ook:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\sync-save.ps1
-```
-
-Ander account of opnieuw inloggen: `-ResetLogin`. Een pc kwijt? Trek zijn sync-token in
-op de site onder *Sync → Account*.
-
----
-
-## 8. Van PIN naar accounts
-
-Wie de site al met de PIN gebruikte, neemt zijn voortgang zo over:
-
-1. Laat `ACCESS_PIN` in `.env` staan en werk bij (zie 5).
-2. Maak op de site een **nieuw** account.
-3. *Sync → Account → Oude voortgang overnemen*: vul de oude PIN in.
-
-Dat kan precies één keer, en alleen in een account zonder eigen voortgang.
-`data/legacy-claim.json` legt vast welk account het was; `data/progress.json` blijft als
-back-up staan maar wordt nergens meer getoond. Doe dit meteen na de update en haal daarna `ACCESS_PIN` uit `.env` (een korte PIN is anders op den duur te raden).
-Het oude sync-script (met PIN) werkt niet meer: draai het nieuwe één keer om in te loggen.
-
----
-
-## Problemen
-
-| Wat je ziet | Oorzaak |
+| Option | Effect |
 |---|---|
-| "Deze deur is op slot" blijft na het inloggen | Cookie geweigerd: draait de site via HTTPS en geeft nginx `X-Forwarded-Proto` door? |
-| "Verzoek van een andere site geweigerd" | nginx geeft de `Host`-header niet door (`include /etc/nginx/proxy_params`). |
-| "Te veel foute pogingen" | 5 foute wachtwoorden of 30 pogingen per IP binnen 15 minuten; wacht een kwartier. |
-| Overnemen hing (crash halverwege) | `data/legacy-claim.json` staat er, maar het account heeft niets. Verwijder dat bestand en probeer opnieuw. |
-| Oude voortgang overnemen staat er niet | `ACCESS_PIN` is leeg, er is geen `data/progress.json`, of hij is al overgenomen. |
-| Steam-sync zegt 0 | In Steam: *Profiel bewerken → Privacy → Game details: Openbaar*. |
+| `-Slot 2` | Save slot 1, 2 or 3 (default 1). |
+| `-SavePath <file>` | Use this save file instead of searching. |
+| `-AfterGame` | Start Isaac, wait for it to close, then sync (what the shortcut does). |
+| `-ResetLogin` | Log in again, or switch account. |
 
-Logs bekijken:
+`-Server` overrides `BOIPT_SERVER`; without `-Server`, the script uses `BOIPT_SERVER`. There is
+no built-in default: if neither is set, the script stops with an error. Pass your server's
+public URL (its `PUBLIC_URL` from `.env`) with `-Server`, or set `BOIPT_SERVER` on the PC; the
+Sync page on the site shows the exact command. The desktop shortcut stores the `-Server` it was
+created with. Use only `https://` (or
+`http://localhost`). Lost a PC? Revoke its sync token on the site under *Sync → Account*.
+
+---
+
+## Upgrading from the PIN version
+
+The single-user PIN login and the PIN takeover are gone. Remove `ACCESS_PIN`, `STEAM_ID`
+and `SESSION_SECRET` from `.env` (the server warns while they are set). An old
+`data/progress.json` is ignored. To keep that progress, copy the file off the server,
+log in to your new account and use *Sync → Restore backup* with it, then delete
+`data/progress.json` (and `data/legacy-claim.json`, if present). The old PIN version of
+the sync script no longer works: run the new one once to log in.
+
+---
+
+## Troubleshooting
+
+| What you see | Cause |
+|---|---|
+| "This door is locked" stays after logging in | Cookie refused: is the site served over HTTPS and does nginx pass `X-Forwarded-Proto`? |
+| "Request from another site refused." | nginx does not pass the `Host` header (`include /etc/nginx/proxy_params`). |
+| "Too many failed attempts." | 5 wrong passwords or 30 attempts per IP within 15 minutes; wait 15 minutes. |
+| "New accounts are currently not being accepted." | Registration is closed; the admin opens it under *Sync → Admin*. |
+| No *Admin* section on the Sync page | You are not logged in as `ADMIN_EMAIL`, or the admin account was never created (check the log, see step 3). |
+| Sync command on the Sync page shows the wrong address | `PUBLIC_URL` is empty or invalid (the log warns); set it to `https://your-domain` and run `docker compose up -d`. |
+| Steam sync says 0 | In Steam: *Edit Profile → Privacy → Game details: Public*. |
+
+View the logs:
 
 ```bash
 docker compose logs -f --tail 50

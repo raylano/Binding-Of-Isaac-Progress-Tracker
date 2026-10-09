@@ -1,4 +1,4 @@
-// Client-side stand: laden, wijzigen, en (vertraagd) naar de server schrijven.
+// Client-side progress: load, modify, and write to the server (debounced).
 
 import { buildModel, normalizeState, serializeState } from './logic.js';
 
@@ -7,7 +7,7 @@ const listeners = new Set();
 export const store = {
   model: null,
   state: null,
-  base: null, // updatedAt van de laatst bekende serverversie
+  base: null, // updatedAt of the last known server version
   config: {},
   session: {},
   status: 'idle', // idle | saving | error
@@ -18,7 +18,7 @@ export class AuthError extends Error {}
 export async function api(path, opts = {}) {
   const res = await fetch(`/api${path}`, { credentials: 'same-origin', ...opts });
   const body = await res.json().catch(() => ({}));
-  if (res.status === 401) throw new AuthError(body.error || 'Niet ingelogd');
+  if (res.status === 401) throw new AuthError(body.error || 'Not logged in');
   if (!res.ok) {
     const err = new Error(body.error || `HTTP ${res.status}`);
     err.status = res.status;
@@ -56,7 +56,7 @@ let pending = false;
 let inflight = false;
 let again = false;
 
-// Wijzig de stand. fn krijgt de state en mag hem muteren.
+// Modify the progress. fn receives the state and may mutate it.
 export function mutate(fn, reason = 'change') {
   const out = fn(store.state);
   store.state.updatedAt = new Date().toISOString();
@@ -103,7 +103,7 @@ export async function flush() {
       setStatus('error');
       emit('auth');
     } else if (err.status === 409 && err.body?.current) {
-      // Een ander apparaat was sneller: neem die stand over.
+      // Another device was faster: take over its state.
       pending = false;
       replaceState(err.body.current, 'conflict');
       setStatus('idle');

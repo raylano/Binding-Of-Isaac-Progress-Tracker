@@ -1,84 +1,84 @@
-// Route-advies: welke run levert nu het meeste op, en waar sta je in de meta-route.
-// Puur, net als logic.js.
+// Route advice: which run pays off most right now, and where you are in the meta route.
+// Pure, just like logic.js.
 
 import { CHARACTERS, CHAR_BY_KEY, MARK_INDEX } from '../data/characters.js';
 import { ROUTE, AVOID, PHASES } from '../data/route.js';
 import { achStatus, markAccess, impliedAchievements, charUnlocked, blockerChain } from './logic.js';
 
-// Een run combineert marks die in één keer haalbaar zijn. In Repentance+ is het
-// Void-portaal gegarandeerd na Hush, ???, The Lamb en Mega Satan, dus Delirium kan
-// achter elke Womb-run aan.
+// A run combines marks that can be earned in one go. In Repentance+ the Void
+// portal is guaranteed after Hush, ???, The Lamb and Mega Satan, so Delirium can
+// be added to the end of any Womb run.
 export const RUNS = [
   {
     key: 'cathedral',
-    name: 'Kathedraal-run',
+    name: 'Cathedral run',
     marks: ['heart', 'bossrush', 'hush', 'isaac', 'bluebaby', 'delirium'],
     path: [
-      'Mom binnen 20 min → Boss Rush',
-      "Mom's Heart binnen 30 min → Blue Womb → Hush",
+      'Mom within 20 min → Boss Rush',
+      "Mom's Heart within 30 min → Blue Womb → Hush",
       'Cathedral → Isaac',
-      'Met The Polaroid naar The Chest → ???',
-      'Void-portaal → Delirium',
+      'The Polaroid to The Chest → ???',
+      'Void portal → Delirium',
     ],
   },
   {
     key: 'sheol',
-    name: 'Sheol-run',
+    name: 'Sheol run',
     marks: ['heart', 'bossrush', 'hush', 'satan', 'lamb', 'delirium'],
     path: [
-      'Mom binnen 20 min → Boss Rush',
-      "Mom's Heart binnen 30 min → Blue Womb → Hush",
+      'Mom within 20 min → Boss Rush',
+      "Mom's Heart within 30 min → Blue Womb → Hush",
       'Sheol → Satan',
-      'Met The Negative naar de Dark Room → The Lamb',
-      'Void-portaal → Delirium',
+      'The Negative to the Dark Room → The Lamb',
+      'Void portal → Delirium',
     ],
   },
   {
     key: 'megasatan',
-    name: 'Mega Satan-run',
+    name: 'Mega Satan run',
     marks: ['heart', 'bossrush', 'hush', 'isaac|satan', 'megasatan', 'delirium'],
     path: [
-      'Bom engelenbeelden en pak beide sleutelstukken (of Dad\'s Key)',
-      'Mom binnen 20 min → Boss Rush; Mom\'s Heart binnen 30 min → Hush',
-      'Cathedral of Sheol → Chest of Dark Room',
-      'Gouden deur in de startkamer → Mega Satan',
-      'Void-portaal → Delirium',
+      'Bomb angel statues and grab both key pieces (or Dad\'s Key)',
+      'Mom within 20 min → Boss Rush; Mom\'s Heart within 30 min → Hush',
+      'Cathedral or Sheol → Chest or Dark Room',
+      'Golden door in the starting room → Mega Satan',
+      'Void portal → Delirium',
     ],
   },
   {
     key: 'mother',
-    name: 'Alt-path-run',
+    name: 'Alt path run',
     marks: ['mother', 'bossrush'],
     path: [
-      'Downpour/Dross II: witte vlam aanraken → spiegel in → mesdeel 1',
-      'Mines/Ashpit II: 3 gele knoppen → mijnkar → mesdeel 2',
-      'Mausoleum/Gehenna II: Mom binnen 25 min (telt voor Boss Rush)',
-      "Vleesdeur met het mes → Mom's Heart → Corpse",
+      'Downpour/Dross II: touch the white fire → enter the mirror → knife piece 1',
+      'Mines/Ashpit II: 3 yellow buttons → minecart → knife piece 2',
+      'Mausoleum/Gehenna II: Mom within 25 min (counts for Boss Rush)',
+      "Flesh door with the knife → Mom's Heart → Corpse",
       'Corpse II → Mother',
     ],
   },
   {
     key: 'home',
-    name: 'Home-run',
+    name: 'Home run',
     marks: ['beast'],
     closet: true,
     path: [
-      'Vanaf je 2e Home-bezoek: leg vóór Dad\'s Note een trinket in een Boss- of Treasure Room (wordt een Cracked Key)',
-      'Mom in Depths II → pak The Polaroid of The Negative',
-      'Terug naar de Strange Door in de startkamer (Polaroid/Negative wordt opgebruikt)',
-      "Mausoleum II: geen Mom-gevecht, de bossroom bevat Dad's Note → Ascent",
-      'Home: kast in de gang openen met de (Cracked) Red Key → tainted personage',
+      'From your 2nd Home visit on: before Dad\'s Note, drop a trinket in a Boss or Treasure Room (it becomes a Cracked Key)',
+      'Mom in Depths II → take The Polaroid or The Negative',
+      'Back to the Strange Door in the starting room (Polaroid/Negative is used up)',
+      "Mausoleum II: no Mom fight, the boss room holds Dad's Note → Ascent",
+      'Home: open the closet in the hallway with the (Cracked) Red Key → tainted character',
       'Dogma → The Beast',
     ],
   },
   {
     key: 'greed',
-    name: 'Greed-run',
+    name: 'Greed run',
     marks: ['greed'],
     greed: true,
     path: [
-      'Greed mode (of Greedier als dat open is: telt als de harde mark)',
-      'Doneer overgebleven munten aan de Greed-machine na Ultra Greed',
+      'Greed mode (or Greedier if unlocked: counts as the hard mark)',
+      'Donate leftover coins to the Greed machine after Ultra Greed',
     ],
   },
 ];
@@ -100,7 +100,7 @@ function cloneMarks(state) {
   return { ...state, marks: Object.fromEntries(Object.entries(state.marks).map(([k, v]) => [k, [...v]])) };
 }
 
-// Wat levert het op als deze marks (op dit niveau) gehaald worden?
+// What does it yield if these marks are earned (at this level)?
 function gainsFor(model, state, charKey, markKeys, level) {
   const sim = cloneMarks(state);
   for (const mk of markKeys) {
@@ -126,8 +126,8 @@ export function planRun(model, state, charKey, run) {
     if (missing.length) blocked.push({ mark: mk, missing });
     else marks.push(mk);
   }
-  // Marks die alleen een "uitstellen"-unlock opleveren laten we bewust liggen
-  // (bijv. Boss Rush als Lazarus = Missing No.).
+  // Marks that only yield a "postpone" unlock are deliberately left alone
+  // (e.g. Boss Rush as Lazarus = Missing No.).
   const skipped = [];
   for (const mk of [...marks]) {
     const own = gainsFor(model, state, charKey, [mk], 1);
@@ -136,7 +136,7 @@ export function planRun(model, state, charKey, run) {
       skipped.push({ mark: mk, ids: own });
     }
   }
-  // De kernbaas van de run moet haalbaar zijn, anders is het geen echte optie.
+  // The run's core boss must be reachable, otherwise it is not a real option.
   const core = run.key === 'cathedral' ? ['bluebaby', 'isaac'] : run.key === 'sheol' ? ['lamb', 'satan']
     : run.key === 'megasatan' ? ['megasatan'] : run.key === 'mother' ? ['mother']
       : run.key === 'home' ? ['beast'] : ['greed'];
@@ -150,7 +150,7 @@ export function planRun(model, state, charKey, run) {
   if (greedier) for (const id of gainsFor(model, state, charKey, ['greed'], 2)) if (!gains.includes(id)) gains.push(id);
   if (closet) gains.push(char.index + 474);
 
-  // Op Hard levert extra op als er Hard-only beloningen (MH-baby, alle Hard-marks) open staan.
+  // Hard pays off extra when Hard-only rewards (MH baby, all Hard marks) are still open.
   const hardOnly = gainsFor(model, state, charKey, marks, 2).filter((id) => !gains.includes(id));
 
   const score = gains.reduce((s, id) => s + valueOf(model, id), 0) + marks.length * 0.35;
@@ -165,8 +165,8 @@ export function plansFor(model, state, charKey) {
     .sort((a, b) => b.score - a.score);
 }
 
-// Beste runs over alle personages heen. Gretig gekozen: een unlock die een eerdere
-// run al oplevert (bijv. A Strange Door) telt bij de volgende niet nog eens mee.
+// Best runs across all characters. Chosen greedily: an unlock that an earlier run
+// already yields (e.g. A Strange Door) does not count again for the next one.
 export function bestRuns(model, state, limit = 6) {
   const candidates = CHARACTERS.flatMap((c) => plansFor(model, state, c.key));
   const claimed = new Set();
@@ -206,7 +206,7 @@ export function routeProgress(model, state) {
   return { steps, current, doneCount, total: steps.length, phases: PHASES };
 }
 
-// Tellers die bijna een unlock opleveren ("nog 1 munt").
+// Counters that are close to yielding an unlock ("1 more coin").
 export function quickWins(model, state, limit = 5) {
   const out = [];
   for (const [id, rule] of model.counterRule) {
@@ -223,8 +223,8 @@ export function quickWins(model, state, limit = 5) {
   return out.sort((a, b) => (a.avoid ? 1 : 0) - (b.avoid ? 1 : 0) || b.ratio - a.ratio).slice(0, limit);
 }
 
-// Verschil tussen jouw stand en de meta: wat je al "te vroeg" hebt en welke
-// uitstel-unlocks nu binnen handbereik liggen.
+// Difference between your progress and the meta: what you already have "too early"
+// and which postpone unlocks are now within reach.
 export function metaNotes(model, state) {
   const notes = [];
   for (const [id, a] of Object.entries(AVOID)) {
@@ -233,7 +233,7 @@ export function metaNotes(model, state) {
     else if (st.status === 'open' && a.level === 'hard') notes.push({ kind: 'pas-op', id: Number(id), ...a });
   }
   if (charUnlocked(state, 'lost') && !state.achievements.has(250)) {
-    notes.push({ kind: 'tip', text: 'Je hebt The Lost, maar Holy Mantle (879 munten in de Greed-machine) nog niet: de guides raden aan zijn marks pas daarna te spelen.', src: ['PIEL', 'JNUB'] });
+    notes.push({ kind: 'tip', text: 'You have The Lost, but not Holy Mantle yet (879 coins in the Greed machine): the guides recommend playing his marks only after that.', src: ['PIEL', 'JNUB'] });
   }
   return notes;
 }

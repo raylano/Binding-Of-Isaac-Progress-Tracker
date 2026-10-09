@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="nl">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Kelderdagboek — Isaac Repentance+</title>
+  <title>BasementDiary — Isaac Repentance+ progress tracker</title>
   <meta name="theme-color" content="#17100b">
   <meta name="robots" content="noindex, nofollow">
   <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
@@ -13,7 +13,7 @@
   <script type="module" src="js/app.js"></script>
 </head>
 <body>
-  <!-- Gedeelde SVG-definities: wiebelige inkt en de 12 bosssymbolen (zelf getekend). -->
+  <!-- Shared SVG definitions: wobbly ink and the 12 boss symbols (hand-drawn). -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
     <defs>
       <filter id="wobble" x="-5%" y="-5%" width="110%" height="110%">
@@ -54,19 +54,19 @@
           <path d="M100 145v12" stroke="#0e0805" stroke-width="6" stroke-linecap="round"/>
         </g>
       </svg>
-      <h1>Deze deur is op slot</h1>
-      <p id="auth-intro">Log in om je eigen kelder in te gaan.</p>
-      <div class="auth-tabs" role="tablist">
-        <button type="button" role="tab" data-mode="login" aria-selected="true">Inloggen</button>
-        <button type="button" role="tab" data-mode="register" aria-selected="false">Nieuw account</button>
+      <h1>This door is locked</h1>
+      <p id="auth-intro">Log in to enter your own basement.</p>
+      <div class="auth-tabs" role="tablist" hidden>
+        <button type="button" role="tab" data-mode="login" aria-selected="true">Log in</button>
+        <button type="button" role="tab" data-mode="register" aria-selected="false">New account</button>
       </div>
       <form id="auth-form" class="auth-form" novalidate>
-        <label for="auth-email">E-mailadres</label>
+        <label for="auth-email">Email address</label>
         <input id="auth-email" name="email" type="email" autocomplete="username" maxlength="254" required>
-        <label for="auth-password">Wachtwoord</label>
+        <label for="auth-password">Password</label>
         <input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required>
-        <p class="auth-hint" id="auth-hint" hidden>Minstens 12 tekens. Een zin van een paar woorden werkt prima.</p>
-        <button type="submit" class="btn blood" id="auth-submit">Naar binnen</button>
+        <p class="auth-hint" id="auth-hint" hidden>At least 12 characters. A sentence of a few words works fine.</p>
+        <button type="submit" class="btn blood" id="auth-submit">Enter</button>
       </form>
       <div class="pin-err" id="pin-err" role="alert"></div>
     </div>
@@ -74,28 +74,26 @@
 
   <header class="hud" id="hud" hidden>
     <div class="hud-row">
-      <a class="logo" href="#/">ApenBoek<small>Repentance+ voortgang</small></a>
+      <a class="logo" href="#/">BasementDiary<small>Repentance+ progress</small></a>
       <div class="hearts" id="hud-hearts" aria-hidden="true"></div>
       <div class="stats" id="hud-stats"></div>
       <div class="hud-spacer"></div>
-      <div class="sync-pill" id="sync-pill"><i></i><span>opgeslagen</span></div>
+      <div class="sync-pill" id="sync-pill"><i></i><span>saved</span></div>
     </div>
-    <nav class="tabs" id="tabs" aria-label="Onderdelen">
-      <a class="tab" href="#/">Kelder</a>
-      <a class="tab" href="#/personages">Personages</a>
-      <a class="tab" href="#/kaart">Kaart</a>
-      <a class="tab" href="#/geheimen">Geheimen</a>
+    <nav class="tabs" id="tabs" aria-label="Sections">
+      <a class="tab" href="#/">Basement</a>
+      <a class="tab" href="#/characters">Characters</a>
+      <a class="tab" href="#/map">Map</a>
+      <a class="tab" href="#/secrets">Secrets</a>
       <a class="tab" href="#/route">Route</a>
       <a class="tab" href="#/sync">Sync</a>
     </nav>
   </header>
 
-  <main id="view" aria-live="polite"><div class="loading">De kelder in…</div></main>
+  <main id="view" aria-live="polite"><div class="loading">Into the basement…</div></main>
 
   <footer id="footer" hidden>
-    Unlock-gegevens: <a href="https://bindingofisaacrebirth.wiki.gg/wiki/Achievements" rel="noopener" target="_blank">Binding of Isaac: Rebirth Wiki</a> (CC BY-SA 3.0).
-    Achievement-iconen: Steam. Route-advies: Steam-guides, zie <a href="#/route">Route</a>.
-    Fanproject, niet verbonden aan Nicalis of Edmund McMillen.
+    Made by <a href="https://buymeacoffee.com/raylanowolfs" rel="noopener noreferrer" target="_blank">Raylano Wolfs</a>
   </footer>
 
   <div class="toasts" id="toasts" aria-live="polite"></div>

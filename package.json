@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Binding of Isaac: Repentance+ voortgangstracker",
+  "description": "BasementDiary: progress tracker for The Binding of Isaac: Repentance+",
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",

@@ -32,7 +32,7 @@ export function update(root) {
               <h4>${esc(s.title)} ${s.status === 'done' ? '' : statusBadge(s.status)}</h4>
               <p class="muted">${esc(s.why)}</p>
               <div class="chips">${s.ach.map((id) => achChip(model, id, state.achievements.has(id) ? '' : 'todo')).join('')}</div>
-              <p class="src">Bron: ${srcLinks(s.src)}</p>
+              <p class="src">Source: ${srcLinks(s.src)}</p>
             </div>
           </article>`;
         }).join('')}</div>
@@ -44,21 +44,21 @@ export function update(root) {
 
   root.innerHTML = `
     <h1 class="view-title">Route</h1>
-    <p class="view-sub">De volgorde die de community-guides aanraden, afgezet tegen jouw stand. Hoe je elk onderdeel haalt, komt uit de wiki (tik een chipje).</p>
+    <p class="view-sub">The order the community guides recommend, compared with your progress. How to get each part comes from the wiki (tap a chip).</p>
     <div class="slab" style="margin-bottom:22px">
-      <div class="row" style="justify-content:space-between"><b style="font-family:var(--font-hand);font-weight:400;font-size:20px">${rp.doneCount} van ${rp.total} stappen</b>
+      <div class="row" style="justify-content:space-between"><b style="font-family:var(--font-hand);font-weight:400;font-size:20px">${rp.doneCount} of ${rp.total} steps</b>
       <span class="src">${srcLinks(['JNUB', 'PIEL', 'TINF'])}</span></div>
       <div style="margin-top:8px">${bar(rp.doneCount, rp.total)}</div>
     </div>
     ${phases}
-    <h2 class="section-title">Liever uitstellen <small>unlocks die je itempool slechter maken</small></h2>
+    <h2 class="section-title">Better postponed <small>unlocks that make your item pool worse</small></h2>
     <div class="ach-list">${avoid.map((a) => {
       const ach = model.byId.get(a.id);
-      const label = a.st.status === 'done' ? 'al binnen' : a.st.status === 'open' ? 'binnen bereik: pas op' : 'nog ver weg';
+      const label = a.st.status === 'done' ? 'already unlocked' : a.st.status === 'open' ? 'within reach: careful' : 'still far away';
       return `<article class="paper ach" data-ach="${a.id}" style="grid-template-columns:40px minmax(0,1fr);cursor:pointer">
         <img class="ach-ico ${a.st.status === 'done' ? '' : a.st.status}" src="${esc(ach.icon || '')}" alt="" loading="lazy" width="40" height="40">
         <div>
-          <div class="t"><b>${esc(ach.name)}</b><span class="badge ${a.level === 'hard' ? 'avoid' : 'mild'}">${a.level === 'hard' ? 'echt uitstellen' : 'geen haast'}</span><span class="badge ${a.st.status}">${label}</span></div>
+          <div class="t"><b>${esc(ach.name)}</b><span class="badge ${a.level === 'hard' ? 'avoid' : 'mild'}">${a.level === 'hard' ? 'really postpone' : 'no hurry'}</span><span class="badge ${a.st.status}">${label}</span></div>
           <div class="h">${esc(ach.how)}</div>
           <div class="u" style="font-style:normal">${esc(a.why)} <span class="src">${srcLinks(a.src)}</span></div>
         </div>
